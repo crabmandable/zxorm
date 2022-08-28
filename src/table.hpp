@@ -3,7 +3,7 @@
 #include "common.hpp"
 #include <algorithm>
 
-namespace zorm {
+namespace zxorm {
 
 template <class T, class... Column>
 class Table {

@@ -5,7 +5,7 @@
 #include <functional>
 #include <sstream>
 
-namespace zorm {
+namespace zxorm {
 class Connection {
 public:
 

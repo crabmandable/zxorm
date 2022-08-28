@@ -2,7 +2,7 @@
 #include <variant>
 #include <functional>
 
-namespace zorm {
+namespace zxorm {
     enum class LogLevel {
         Error = 0,
         Warning = 1,

@@ -2,7 +2,7 @@
 #include "connection.hpp"
 #include "table.hpp"
 
-void logger(zorm::LogLevel level, const char* msg) {
+void logger(zxorm::LogLevel level, const char* msg) {
     std::cout << "connection logger (" << (int)level << "): ";
     std::cout << msg << std::endl;
 }
@@ -17,7 +17,7 @@ struct User {
 };
 
 int main (void) {
-    using namespace zorm;
+    using namespace zxorm;
     auto createdConn = Connection::Create("test.db", 0, 0, &logger);
 
     if (!std::holds_alternative<Connection>(createdConn)) {
