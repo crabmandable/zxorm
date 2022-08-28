@@ -1,7 +1,7 @@
 #pragma once
 
 #include <sqlite3.h>
-#include "./common.hpp"
+#include "zxorm/common.hpp"
 #include <functional>
 #include <sstream>
 
