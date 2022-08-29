@@ -37,11 +37,13 @@ struct Object {
     void setName(std::string name) { _name = name; }
 };
 
+using table_t = Table<"test", Object,
+    Column<"id", &Object::_id>,
+    Column<"name", &Object::_name>
+        > ;
+
 TEST_F(TableTest, Columns) {
-    Table<"test", Object,
-        Column<"id", &Object::_id>,
-        Column<"name", &Object::_name>
-            > table;
+    table_t table;
 
     ASSERT_EQ(table.columnName(0), "id");
     ASSERT_EQ(table.columnName(1), "name");
@@ -56,10 +58,11 @@ TEST_F(TableTest, ColumnsPrivate) {
     ASSERT_EQ(table.columnName(1), "name");
 }
 
+TEST_F(TableTest, nColumns) {
+    ASSERT_EQ(table_t::nColumns(), 2);
+}
+
 TEST_F(TableTest, CreateTableQuery) {
-    using table_t = Table<"test", Object,
-        Column<"id", &Object::_id>,
-        Column<"name", &Object::_name>
-            > ;
     std::cout << table_t::createTableQuery();
 }
+

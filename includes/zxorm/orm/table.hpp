@@ -22,6 +22,10 @@ class Table {
             return name;
         }
 
+        static constexpr int nColumns() {
+            return std::tuple_size<std::tuple<Column...>>();
+        }
+
         static constexpr std::string createTableQuery() {
             std::ostringstream query;
             query << "CREATE TABLE " << tableName.value << " (" << std::endl;
