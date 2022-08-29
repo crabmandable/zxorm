@@ -9,7 +9,7 @@ namespace zxorm {
 class Connection {
 public:
 
-    static Maybe<Connection> Create(const char* fileName, int flags = 0, const char* zVfs = nullptr, Logger logger = nullptr) {
+    static Maybe<Connection> create(const char* fileName, int flags = 0, const char* zVfs = nullptr, Logger logger = nullptr) {
         if (!flags) {
             flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
         }

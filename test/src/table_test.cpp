@@ -12,7 +12,7 @@ void logger(LogLevel level, const char* msg) {
 class TableTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    auto createdConn = Connection::Create("test.db", 0, 0, &logger);
+    auto createdConn = Connection::create("test.db", 0, 0, &logger);
     if (!std::holds_alternative<Connection>(createdConn)) {
         throw "Unable to open connection";
     }
@@ -38,24 +38,28 @@ struct Object {
 };
 
 TEST_F(TableTest, Columns) {
-    Table<Object,
+    Table<"test", Object,
         Column<"id", &Object::_id>,
         Column<"name", &Object::_name>
             > table;
 
-    Object o;
-    o.setId(100);
-    o.setName("Steve");
-    table.printColumns(o);
+    ASSERT_EQ(table.columnName(0), "id");
+    ASSERT_EQ(table.columnName(1), "name");
 }
 
 TEST_F(TableTest, ColumnsPrivate) {
-    Table<Object,
+    Table<"test", Object,
         ColumnPrivate<"id", &Object::getId, &Object::setId>,
         ColumnPrivate<"name", &Object::getName, &Object::setName>
             > table;
-    Object o;
-    o.setId(100);
-    o.setName("Steve");
-    table.printColumns(o);
+    ASSERT_EQ(table.columnName(0), "id");
+    ASSERT_EQ(table.columnName(1), "name");
+}
+
+TEST_F(TableTest, CreateTableQuery) {
+    using table_t = Table<"test", Object,
+        Column<"id", &Object::_id>,
+        Column<"name", &Object::_name>
+            > ;
+    std::cout << table_t::createTableQuery();
 }
