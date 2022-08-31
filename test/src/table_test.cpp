@@ -44,8 +44,8 @@ using table_t = Table<"test", Object,
         > ;
 
 using tablepriv_t = Table<"test", Object,
-    ColumnPrivate<"id", &Object::getId, &Object::setId>,
-    ColumnPrivate<"name", &Object::getName, &Object::setName>
+    Column<"id", &Object::getId, &Object::setId>,
+    Column<"name", &Object::getName, &Object::setName>
         > ;
 
 TEST_F(TableTest, Columns) {
@@ -69,7 +69,7 @@ TEST_F(TableTest, CreateTableQuery) {
     std::string query = table_t::createTableQuery();
     std::regex reg ("\\s+");
     auto trimmed = std::regex_replace (query, reg, " ");
-    ASSERT_EQ(trimmed, "CREATE TABLE test ( id INT, name TEXT );");
+    ASSERT_EQ(trimmed, "CREATE TABLE test ( id INTEGER, name TEXT );");
     std::string same = tablepriv_t::createTableQuery();
     ASSERT_EQ(same, query);
 }
