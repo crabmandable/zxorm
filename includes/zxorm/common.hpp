@@ -35,7 +35,7 @@ namespace zxorm {
     // Some stack overflow voodoo
     // https://stackoverflow.com/questions/81870/is-it-possible-to-print-a-variables-type-in-standard-c/56766138#56766138
     template <typename T>
-    constexpr auto type_name() {
+    consteval auto type_name() {
         std::string_view name, prefix, suffix;
 #ifdef __clang__
         name = __PRETTY_FUNCTION__;
