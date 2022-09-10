@@ -9,7 +9,7 @@ enum class sql_type_t {
     NUMERIC,
 };
 
-static consteval const char* sqlTypeStr(sql_type_t t) {
+static constexpr const char* sqlTypeStr(sql_type_t t) {
     switch(t) {
         case sql_type_t::INTEGER: {
             return "INTEGER";
@@ -25,6 +25,28 @@ static consteval const char* sqlTypeStr(sql_type_t t) {
         }
         case sql_type_t::NUMERIC: {
             return "NUMERIC";
+        }
+    }
+
+    return "OOPS";
+}
+
+enum class order_t {
+    NONE,
+    ASC,
+    DESC,
+};
+
+static constexpr const char* orderStr(order_t t) {
+    switch(t) {
+        case order_t::NONE: {
+            return "";
+        }
+        case order_t::ASC: {
+            return "ASC";
+        }
+        case order_t::DESC: {
+            return "DESC";
         }
     }
 

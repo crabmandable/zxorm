@@ -5,33 +5,12 @@
 
 using namespace zxorm;
 
-void logger(LogLevel level, const char* msg) {
-    std::cout << "connection logger (" << (int)level << "): ";
-    std::cout << msg << std::endl;
-}
-
-class TableTest : public ::testing::Test {
- protected:
-  void SetUp() override {
-    auto createdConn = Connection::create("test.db", 0, 0, &logger);
-    if (!std::holds_alternative<Connection>(createdConn)) {
-        throw "Unable to open connection";
-    }
-
-     myConn = std::make_shared<Connection>(std::move(std::get<Connection>(createdConn)));
-  }
-
-  std::shared_ptr<Connection> myConn;
-
-  void TearDown() override {
-      myConn = nullptr;
-      std::filesystem::remove("test.db");
-  }
-};
-
 struct Object {
     int _id = 0;
     std::string _name;
+    int _someId = 0;
+    std::string _someText;
+    float _someFloat;
     auto getId() { return _id; }
     void setId(int id) { _id = id; }
     auto getName() { return _name; }
@@ -43,10 +22,45 @@ using table_t = Table<"test", Object,
     Column<"name", &Object::_name>
         > ;
 
-using tablepriv_t = Table<"test", Object,
-    Column<"id", &Object::getId, &Object::setId>,
-    Column<"name", &Object::getName, &Object::setName>
+using tablepriv_t = Table<"test_private", Object,
+    ColumnPrivate<"id",&Object::getId, &Object::setId>,
+    ColumnPrivate<"name", &Object::getName, &Object::setName>
         > ;
+
+using table_with_column_constraints_t = Table<"test_constraints", Object,
+    Column<"id", &Object::_id, column_constraint::PrimaryKey<conflict_t::ABORT>>,
+    Column<"name", &Object::_name, column_constraint::NotNull<>, column_constraint::Unique<>>,
+    Column<"text", &Object::_someText, column_constraint::Unique<conflict_t::REPLACE>>,
+    Column<"float", &Object::_someFloat>,
+    Column<"someId", &Object::_someId>
+        > ;
+
+using MyConnection = Connection<table_t, tablepriv_t, table_with_column_constraints_t>;
+
+void logger(LogLevel level, const char* msg) {
+    std::cout << "connection logger (" << (int)level << "): ";
+    std::cout << msg << std::endl;
+}
+
+class TableTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    auto createdConn = MyConnection::create("test.db", 0, 0, &logger);
+    if (!std::holds_alternative<MyConnection>(createdConn)) {
+        throw "Unable to open connection";
+    }
+
+     myConn = std::make_shared<MyConnection>(std::move(std::get<MyConnection>(createdConn)));
+  }
+
+  std::shared_ptr<MyConnection> myConn;
+
+  void TearDown() override {
+      myConn = nullptr;
+      std::filesystem::remove("test.db");
+  }
+};
+
 
 TEST_F(TableTest, Columns) {
     table_t table;
@@ -62,19 +76,36 @@ TEST_F(TableTest, ColumnsPrivate) {
 }
 
 TEST_F(TableTest, nColumns) {
-    ASSERT_EQ(table_t::nColumns(), 2);
+    ASSERT_EQ(table_t::nColumns, 2);
 }
 
 TEST_F(TableTest, CreateTableQuery) {
-    std::string query = table_t::createTableQuery();
+    std::string query = table_t::createTableQuery(false);
     std::regex reg ("\\s+");
     auto trimmed = std::regex_replace (query, reg, " ");
-    ASSERT_EQ(trimmed, "CREATE TABLE test ( id INTEGER, name TEXT );");
-    std::string same = tablepriv_t::createTableQuery();
+    ASSERT_EQ(trimmed, "CREATE TABLE test ( `id` INTEGER, `name` TEXT ); ");
+    std::string same = tablepriv_t::createTableQuery(false);
+    std::regex reg2 ("_private");
+    same = std::regex_replace (same, reg2, "");
     ASSERT_EQ(same, query);
 }
 
-TEST_F(TableTest, dbg) {
-    table_t::printTable();
-    tablepriv_t::printTable();
+TEST_F(TableTest, CreateWithConstraintsTableQuery) {
+    std::string query = table_with_column_constraints_t::createTableQuery(false);
+    std::regex reg ("\\s+");
+    auto trimmed = std::regex_replace (query, reg, " ");
+    std::string expected = "CREATE TABLE test_constraints ( "
+        "`id` INTEGER PRIMARY KEY ON CONFLICT ABORT, "
+        "`name` TEXT NOT NULL ON CONFLICT ABORT UNIQUE ON CONFLICT ABORT, "
+        "`text` TEXT UNIQUE ON CONFLICT REPLACE, "
+        "`float` REAL, "
+        "`someId` INTEGER "
+        "); ";
+    ASSERT_EQ(trimmed, expected);
+}
+
+TEST_F(TableTest, CreateTables) {
+    auto err = myConn->createTables(false);
+    if (err) std::cout << std::string(err.value()) << std::endl;
+    else std::cout << "suckus\n";
 }

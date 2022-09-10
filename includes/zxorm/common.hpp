@@ -1,7 +1,9 @@
 #pragma once
+#include <sqlite3.h>
 #include <variant>
 #include <functional>
 #include <string_view>
+#include <string>
 
 namespace zxorm {
     enum class LogLevel {
@@ -14,10 +16,15 @@ namespace zxorm {
     using Logger = std::function<void(LogLevel, const char*)>;
 
     struct Error {
-        Error(const char* err, int sqlite_result) : err(err), sqlite_result(sqlite_result) { }
-        const char* const err = nullptr;
+        Error(const char* const err, int sqlite_result) : err(err), sqlite_result(sqlite_result) {}
+        const char* err;
         int sqlite_result;
-        operator const char* () { return err; }
+
+        operator std::string () const {
+            const char* sqlErr = sqlite3_errstr(sqlite_result);
+            std::string out = std::string(err) + ": " + std::string(sqlErr);
+            return out;
+        }
     };
 
     template <class T>
