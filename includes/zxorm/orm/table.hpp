@@ -28,7 +28,7 @@ class Table {
             std::stringstream query;
             query << "CREATE TABLE ";
             if (ifNotExist)
-                query << "IF NOT EXIST ";
+                query << "IF NOT EXISTS ";
             query << tableName.value << " (\n";
             ([&] {
                 query << '\t'
