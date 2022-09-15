@@ -15,7 +15,7 @@ template <FixedLengthString tableName, class T, ColumnBelongingToClass<T>... Col
 class Table {
 
     public:
-        static constexpr std::string columnName(int idx) {
+        static std::string columnName(int idx) {
             int i = 0;
             std::string name;
             ((name = i == idx ? Column::name() : name, i++), ...);
@@ -24,7 +24,7 @@ class Table {
 
         static constexpr int nColumns = std::tuple_size<std::tuple<Column...>>();
 
-        static constexpr std::string createTableQuery(bool ifNotExist) {
+        static std::string createTableQuery(bool ifNotExist) {
             std::stringstream query;
             query << "CREATE TABLE ";
             if (ifNotExist)

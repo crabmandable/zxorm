@@ -1,6 +1,8 @@
 #pragma once
 
 #include "zxorm/common.hpp"
+#include <sstream>
+
 namespace zxorm {
     enum class conflict_t {
         ABORT,
@@ -32,7 +34,7 @@ namespace zxorm {
         // TODO support default with expr
         template<FixedLengthString value>
         struct Default {
-            constexpr static std::string to_string() {
+            static std::string to_string() {
                 std::stringstream ss;
                 ss << "DEFAULT '" << value.value << "'";
                 return ss.str();
@@ -41,7 +43,7 @@ namespace zxorm {
 
         template<FixedLengthString value>
         struct Collate {
-            constexpr static std::string to_string() {
+            static std::string to_string() {
                 std::stringstream ss;
                 ss << "COLLATE " << value.value;
                 return ss.str();
@@ -50,7 +52,7 @@ namespace zxorm {
 
         template<FixedLengthString constraint, conflict_t onConflict>
         struct ConstraintWithConflictClause {
-            constexpr static std::string to_string() {
+            static std::string to_string() {
                 std::stringstream ss;
                 ss << constraint.value << " ON CONFLICT " << conflictStr(onConflict);
                 return ss.str();

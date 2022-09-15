@@ -2,6 +2,9 @@
 
 #include "zxorm/common.hpp"
 #include "zxorm/orm/types.hpp"
+
+#include <sstream>
+
 namespace zxorm {
 
     template <FixedLengthString columnName, auto M, class... Constraint>
@@ -26,14 +29,14 @@ namespace zxorm {
         };
 
         public:
-        using MemberType = find_column_type<decltype(M)>::type;
+        using MemberType = typename find_column_type<decltype(M)>::type;
         static_assert(!std::is_same<MemberType, std::false_type>::value, "Column template argument should be a pointer to a class member");
-        using ObjectClass = find_column_type<decltype(M)>::klass;
+        using ObjectClass = typename find_column_type<decltype(M)>::klass;
         static constexpr const char* name() { return columnName.value; }
         static auto getter(auto obj) { return obj.*M; };
         static void setter(auto obj, auto arg) { obj.*M = arg; };
 
-        static constexpr std::string creationConstraints() {
+        static std::string creationConstraints() {
             std::stringstream ss;
             ([&] {
                 ss << Constraint::to_string() << " ";
@@ -107,13 +110,13 @@ namespace zxorm {
                 "Column template arguments should be a pointers to class methods that get and set the column data");
 
         public:
-        using MemberType = SetterResolved::argType;
-        using ObjectClass = SetterResolved::klass;
+        using MemberType = typename SetterResolved::argType;
+        using ObjectClass = typename SetterResolved::klass;
         static constexpr const char* name() { return columnName.value; }
         static auto getter(auto obj) { return (obj.*Getter)(); };
         static void setter(auto obj, auto arg) { (obj.*Setter)(arg); };
 
-        static constexpr std::string creationConstraints() {
+        static std::string creationConstraints() {
             std::stringstream ss;
             ([&] {
                 ss << Constraint::query() << ",";

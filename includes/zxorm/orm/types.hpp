@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+
 namespace zxorm {
 
 enum class sql_type_t {
