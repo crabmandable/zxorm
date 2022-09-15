@@ -107,5 +107,15 @@ TEST_F(TableTest, CreateWithConstraintsTableQuery) {
 TEST_F(TableTest, CreateTables) {
     auto err = myConn->createTables(false);
     if (err) std::cout << std::string(err.value()) << std::endl;
-    else std::cout << "suckus\n";
+    ASSERT_FALSE(err);
+}
+
+TEST_F(TableTest, CreateIfExistsTables) {
+    auto err = myConn->createTables(true);
+    if (err) std::cout << std::string(err.value()) << std::endl;
+    ASSERT_FALSE(err);
+
+    err = myConn->createTables(true);
+    if (err) std::cout << std::string(err.value()) << std::endl;
+    ASSERT_FALSE(err);
 }
