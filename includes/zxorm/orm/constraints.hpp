@@ -6,24 +6,24 @@
 
 namespace zxorm {
     enum class conflict_t {
-        ABORT,
-        ROLLBACK,
-        FAIL,
-        IGNORE,
-        REPLACE,
+        abort,
+        rollback,
+        fail,
+        ignore,
+        replace,
     };
 
     constexpr const char* conflictStr(conflict_t c) {
         switch(c) {
-            case conflict_t::ROLLBACK:
+            case conflict_t::rollback:
                 return "ROLLBACK";
-            case conflict_t::ABORT:
+            case conflict_t::abort:
                 return "ABORT";
-            case conflict_t::FAIL:
+            case conflict_t::fail:
                 return "FAIL";
-            case conflict_t::IGNORE:
+            case conflict_t::ignore:
                 return "IGNORE";
-            case conflict_t::REPLACE:
+            case conflict_t::replace:
                 return "REPLACE";
         };
 
@@ -32,24 +32,24 @@ namespace zxorm {
 
 
     enum class action_t {
-        NO_ACTION,
-        RESTRICT,
-        SET_NULL,
-        SET_DEFAULT,
-        CASCADE,
+        no_action,
+        restrict,
+        set_null,
+        set_default,
+        cascade,
     };
 
     constexpr const char* actionStr(action_t c) {
         switch(c) {
-            case action_t::NO_ACTION:
+            case action_t::no_action:
                 return "NO_ACTION";
-            case action_t::RESTRICT:
+            case action_t::restrict:
                 return "RESTRICT";
-            case action_t::SET_NULL:
+            case action_t::set_null:
                 return "SET_NULL";
-            case action_t::SET_DEFAULT:
+            case action_t::set_default:
                 return "SET_DEFAULT";
-            case action_t::CASCADE:
+            case action_t::cascade:
                 return "CASCADE";
         };
 
@@ -71,7 +71,7 @@ namespace zxorm {
         };
 
     // TODO support defferrable
-    template<typename Reference, action_t onUpdate=action_t::NO_ACTION, action_t onDelete=action_t::NO_ACTION>
+    template<typename Reference, action_t onUpdate=action_t::no_action, action_t onDelete=action_t::no_action>
         struct ForeignKey {
             static std::string to_string() {
                 std::ostringstream ss;
@@ -86,7 +86,7 @@ namespace zxorm {
     template<FixedLengthString value>
         struct Default {
             static std::string to_string() {
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << "DEFAULT '" << value.value << "'";
                 return ss.str();
             }
@@ -110,19 +110,19 @@ namespace zxorm {
             }
         };
 
-    template<conflict_t onConflict=conflict_t::ABORT>
+    template<conflict_t onConflict=conflict_t::abort>
         using Unique = ConstraintWithConflictClause<"UNIQUE", onConflict>;
 
-    template<conflict_t onConflict=conflict_t::ABORT>
+    template<conflict_t onConflict=conflict_t::abort>
         using NotNull = ConstraintWithConflictClause<"NOT NULL", onConflict>;
 
-    template<conflict_t onConflict=conflict_t::ABORT>
+    template<conflict_t onConflict=conflict_t::abort>
         using PrimaryKey = ConstraintWithConflictClause<"PRIMARY KEY", onConflict>;
 
-    template<conflict_t onConflict=conflict_t::ABORT>
+    template<conflict_t onConflict=conflict_t::abort>
         using PrimaryKeyAsc = ConstraintWithConflictClause<"PRIMARY KEY ASC", onConflict>;
 
-    template<conflict_t onConflict=conflict_t::ABORT>
+    template<conflict_t onConflict=conflict_t::abort>
         using PrimaryKeyDesc = ConstraintWithConflictClause<"PRIMARY KEY DESC", onConflict>;
 
     //TODO add `CHECK` constraint

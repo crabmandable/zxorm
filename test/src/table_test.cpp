@@ -28,11 +28,11 @@ using tablepriv_t = Table<"test_private", Object,
         > ;
 
 using table_with_column_constraints_t = Table<"test_constraints", Object,
-    Column<"id", &Object::_id, PrimaryKey<conflict_t::ABORT>>,
+    Column<"id", &Object::_id, PrimaryKey<conflict_t::abort>>,
     Column<"name", &Object::_name, NotNull<>, Unique<>>,
-    Column<"text", &Object::_someText, Unique<conflict_t::REPLACE>>,
+    Column<"text", &Object::_someText, Unique<conflict_t::replace>>,
     Column<"float", &Object::_someFloat>,
-    Column<"someId", &Object::_someId, ForeignKey<Reference<"test", "id">, action_t::CASCADE, action_t::RESTRICT>>
+    Column<"someId", &Object::_someId, ForeignKey<Reference<"test", "id">, action_t::cascade, action_t::restrict>>
         >;
 
 using MyConnection = Connection<table_t, tablepriv_t, table_with_column_constraints_t>;
