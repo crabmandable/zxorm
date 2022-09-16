@@ -28,12 +28,12 @@ using tablepriv_t = Table<"test_private", Object,
         > ;
 
 using table_with_column_constraints_t = Table<"test_constraints", Object,
-    Column<"id", &Object::_id, column_constraint::PrimaryKey<conflict_t::ABORT>>,
-    Column<"name", &Object::_name, column_constraint::NotNull<>, column_constraint::Unique<>>,
-    Column<"text", &Object::_someText, column_constraint::Unique<conflict_t::REPLACE>>,
+    Column<"id", &Object::_id, PrimaryKey<conflict_t::ABORT>>,
+    Column<"name", &Object::_name, NotNull<>, Unique<>>,
+    Column<"text", &Object::_someText, Unique<conflict_t::REPLACE>>,
     Column<"float", &Object::_someFloat>,
-    Column<"someId", &Object::_someId>
-        > ;
+    Column<"someId", &Object::_someId, ForeignKey<Reference<"test", "id">, action_t::CASCADE, action_t::RESTRICT>>
+        >;
 
 using MyConnection = Connection<table_t, tablepriv_t, table_with_column_constraints_t>;
 
@@ -99,7 +99,7 @@ TEST_F(TableTest, CreateWithConstraintsTableQuery) {
         "`name` TEXT NOT NULL ON CONFLICT ABORT UNIQUE ON CONFLICT ABORT, "
         "`text` TEXT UNIQUE ON CONFLICT REPLACE, "
         "`float` REAL, "
-        "`someId` INTEGER "
+        "`someId` INTEGER REFERENCES `test` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT "
         "); ";
     ASSERT_EQ(trimmed, expected);
 }
