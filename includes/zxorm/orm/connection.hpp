@@ -57,6 +57,7 @@ namespace zxorm {
 
         std::optional<Error> createTables(bool ifNotExist = true) {
             std::optional<Error> error = std::nullopt;
+            // TODO make this a transaction
             ([&] {
                 if (error) return;
                 std::string createQ = Table::createTableQuery(ifNotExist);
