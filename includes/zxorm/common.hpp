@@ -1,9 +1,12 @@
 #pragma once
 #include <sqlite3.h>
+#include <type_traits>
 #include <variant>
 #include <functional>
 #include <string_view>
 #include <string>
+#include <sstream>
+#include <iterator>
 
 namespace zxorm {
     enum class LogLevel {
@@ -39,26 +42,19 @@ namespace zxorm {
         char value[N];
     };
 
-    // Some stack overflow voodoo
-    // https://stackoverflow.com/questions/81870/is-it-possible-to-print-a-variables-type-in-standard-c/56766138#56766138
-    template <typename T>
-    consteval auto type_name() {
-        std::string_view name, prefix, suffix;
-#ifdef __clang__
-        name = __PRETTY_FUNCTION__;
-        prefix = "auto zxorm::type_name() [T = ";
-        suffix = "]";
-#elif defined(__GNUC__)
-        name = __PRETTY_FUNCTION__;
-        prefix = "constexpr auto zxorm::type_name() [with T = ";
-        suffix = "]";
-#elif defined(_MSC_VER)
-        name = __FUNCSIG__;
-        prefix = "auto __cdecl zxorm::type_name<";
-        suffix = ">(void)";
-#endif
-        name.remove_prefix(prefix.size());
-        name.remove_suffix(suffix.size());
-        return name;
+
+    template<typename... T>
+    auto appendToStringStream(std::ostringstream& ss, const char * delim) {
+        std::array<std::string, sizeof...(T)> strings = {T::to_string()...};
+        std::copy(strings.begin(), strings.end(),
+                std::ostream_iterator<std::string>(ss, delim));
+    }
+
+    template<FixedLengthString...string>
+    requires requires { (sizeof(string.value) + ...); }
+    void appendToStringStream(std::ostringstream& ss, const char * delim) {
+        std::array<std::string, sizeof...(string)> strings = {string.value...};
+        std::copy(strings.begin(), strings.end(),
+                std::ostream_iterator<std::string>(ss, delim));
     }
 };

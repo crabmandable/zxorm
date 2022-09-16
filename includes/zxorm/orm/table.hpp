@@ -31,9 +31,9 @@ class Table {
                 query << "IF NOT EXISTS ";
             query << tableName.value << " (\n";
             ([&] {
-                query << '\t'
-                << "`" << Column::name() << "` "
-                << sqlTypeStr(Column::SQLMemberType);
+                query << '\t' << "`" << Column::name() << "` "
+                    << sqlTypeStr(Column::SQLMemberType);
+
                 auto constraints = Column::creationConstraints();
                 if (!constraints.empty()) {
                     query << " " << constraints;

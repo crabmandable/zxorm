@@ -2,6 +2,7 @@
 
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
+#include "zxorm/orm/statement.hpp"
 #include <functional>
 #include <sstream>
 #include <memory>
@@ -58,64 +59,35 @@ namespace zxorm {
         std::optional<Error> createTables(bool ifNotExist = true) {
             std::optional<Error> error = std::nullopt;
             // TODO make this a transaction
-            ([&] {
-                if (error) return;
-                std::string createQ = Table::createTableQuery(ifNotExist);
-                Statement s = {this, createQ};
+
+            std::array<statement_t,  sizeof...(Table)> statements = {statement_t(this, Table::createTableQuery(ifNotExist))...};
+
+            for (auto& s : statements) {
                 error = s.error;
-                if (error) return;
+                if (error) break;
                 error = s.step();
-            }(), ...);
+                if (error) break;
+            }
 
             return error;
         }
 
+        template<class T, typename PrimaryKeyType=int>
+        std::optional<Error> Find(PrimaryKeyType id) {
+            (void)id;
+            return std::nullopt;
+        }
+
     private:
+        friend class Statement<Connection, Table...>;
+        using statement_t = Statement<Connection, Table...>;
+
         Connection(const Connection&) = delete;
         Connection operator =(const Connection&) = delete;
         Connection(sqlite3* db_handle, Logger logger) : _db_handle(db_handle) {
             if (logger) _logger = logger;
             else _logger = [](auto...) {};
         }
-
-        struct Statement {
-            Connection<Table...>* conn;
-            sqlite3_stmt* stmt;
-            std::optional<Error> error = std::nullopt;
-
-            Statement(Connection<Table...>* conn, const std::string& query) : conn{conn} {
-                conn->_logger(LogLevel::Debug, "Prepared statement");
-                conn->_logger(LogLevel::Debug, query.c_str());
-
-                int result = sqlite3_prepare_v2(conn->_db_handle, query.c_str(), query.size() + 1, &stmt, nullptr);
-                if (result != SQLITE_OK) {
-                    const char* str = sqlite3_errstr(result);
-                    conn->_logger(LogLevel::Error, "Unable to initialize statment");
-                    conn->_logger(LogLevel::Error, str);
-                    error = Error("Unable to initialize statement", result);
-                }
-            }
-
-            ~Statement() {
-                int result = sqlite3_finalize(stmt);
-                if (result != SQLITE_OK) {
-                    const char* str = sqlite3_errstr(result);
-                    conn->_logger(LogLevel::Error, "Unable to finalize statment");
-                    conn->_logger(LogLevel::Error, str);
-                }
-            }
-
-            std::optional<Error> step() {
-                int result = sqlite3_step(stmt);
-                if (result != SQLITE_OK && result != SQLITE_DONE) {
-                    conn->_logger(LogLevel::Error, "Unable to execute statment");
-                    return Error("Unable to execute statment", result);
-                }
-
-                return std::nullopt;
-
-            }
-        };
 
         sqlite3* _db_handle;
         Logger _logger = nullptr;

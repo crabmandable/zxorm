@@ -1,6 +1,6 @@
 * Cleanup template errors
 
-* Defferrable Foreign keys
+* Deferrable Foreign keys
 
 * Expressions:
     * Check
@@ -8,9 +8,22 @@
 
 * Selects:
     * T Find<T>(int id);
+    * Handle finding by multi-column primary key
     * Where
 
+* Table constraints
+
+* Save<T>(T& record);
+
+* Update
+
+* Delete
+
+* Bulk insert
+
 * Relationships
+
+* Transactions
 
 * Tests:
     * Constraints

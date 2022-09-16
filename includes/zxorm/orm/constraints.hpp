@@ -59,13 +59,13 @@ namespace zxorm {
     template<FixedLengthString tableName, FixedLengthString... column>
         struct Reference {
             static std::string to_string() {
-                std::stringstream ss;
-                ss << "REFERENCES `" << tableName.value << "` (";
-                ([&]() {
-                 ss << "`" << column.value << "`, ";
-                 }(), ...);
+                std::ostringstream ss;
+                ss << "REFERENCES `" << tableName.value << "` (`";
+
+                appendToStringStream<column...>(ss, "`, `");
+
                 std::string str = ss.str();
-                str.erase(str.end() - 2, str.end());
+                str.erase(str.end() - 3, str.end());
                 return str + ")";
             }
         };
@@ -74,7 +74,7 @@ namespace zxorm {
     template<typename Reference, action_t onUpdate=action_t::NO_ACTION, action_t onDelete=action_t::NO_ACTION>
         struct ForeignKey {
             static std::string to_string() {
-                std::stringstream ss;
+                std::ostringstream ss;
                 ss << Reference::to_string()
                     << " ON UPDATE " << actionStr(onUpdate)
                     << " ON DELETE " << actionStr(onDelete);

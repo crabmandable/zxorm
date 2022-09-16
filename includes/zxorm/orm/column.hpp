@@ -3,8 +3,6 @@
 #include "zxorm/common.hpp"
 #include "zxorm/orm/types.hpp"
 
-#include <sstream>
-
 namespace zxorm {
 
     template <FixedLengthString columnName, auto M, class... Constraint>
@@ -37,10 +35,8 @@ namespace zxorm {
         static void setter(auto obj, auto arg) { obj.*M = arg; };
 
         static std::string creationConstraints() {
-            std::stringstream ss;
-            ([&] {
-                ss << Constraint::to_string() << " ";
-            }(), ...);
+            std::ostringstream ss;
+            appendToStringStream<Constraint...>(ss, " ");
 
             std::string qstr = ss.str();
             // erase trailing comma
