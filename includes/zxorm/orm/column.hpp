@@ -2,34 +2,38 @@
 
 #include "zxorm/common.hpp"
 #include "zxorm/orm/types.hpp"
+#include "zxorm/orm/constraints.hpp"
+#include <type_traits>
 
 namespace zxorm {
 
     template <FixedLengthString columnName, auto M, class... Constraint>
     class Column {
         template< typename T >
-        struct find_column_type : std::false_type
+        struct FindColumnType : std::false_type
         {
             using type = std::false_type;
         };
 
         template< typename R, typename C, class A>
-        struct find_column_type< R (C::*)(A) >
+        struct FindColumnType< R (C::*)(A) >
         {
             using type = std::false_type;
         };
 
         template< typename R, typename C>
-        struct find_column_type< R C::* >
+        struct FindColumnType< R C::* >
         {
             using type = R;
             using klass = C;
         };
 
         public:
-        using MemberType = typename find_column_type<decltype(M)>::type;
+        using MemberType = typename FindColumnType<decltype(M)>::type;
         static_assert(!std::is_same<MemberType, std::false_type>::value, "Column template argument should be a pointer to a class member");
-        using ObjectClass = typename find_column_type<decltype(M)>::klass;
+        using ObjectClass = typename FindColumnType<decltype(M)>::klass;
+        static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
+
         static constexpr const char* name() { return columnName.value; }
         static auto getter(auto obj) { return obj.*M; };
         static void setter(auto obj, auto arg) { obj.*M = arg; };
@@ -55,7 +59,7 @@ namespace zxorm {
     class ColumnPrivate {
         private:
         template< typename T >
-        struct resolve_function_ptr_types : std::false_type
+        struct ResolveFnPtrTypes : std::false_type
         {
             using argType = std::false_type;
             using returnType = void;
@@ -64,7 +68,7 @@ namespace zxorm {
 
         // pointer to setter
         template<typename C, class A >
-        struct resolve_function_ptr_types< void (C::*)(A) >
+        struct ResolveFnPtrTypes< void (C::*)(A) >
         {
             using argType = A;
             using klass = C;
@@ -73,7 +77,7 @@ namespace zxorm {
 
         // pointer to getter
         template< typename R, typename C  >
-        struct resolve_function_ptr_types< R (C::*)() >
+        struct ResolveFnPtrTypes< R (C::*)() >
         {
             using argType = std::false_type;
             using klass = C;
@@ -82,24 +86,24 @@ namespace zxorm {
 
         // pointer to member
         template< typename R, typename C>
-        struct resolve_function_ptr_types< R C::* >
+        struct ResolveFnPtrTypes< R C::* >
         {
             using argType = std::false_type;
             using returnType = void;
             using klass = std::false_type;
         };
 
-        using SetterResolved = resolve_function_ptr_types<decltype(Setter)>;
-        using GetterResolved = resolve_function_ptr_types<decltype(Getter)>;
+        using SetterResolved = ResolveFnPtrTypes<decltype(Setter)>;
+        using GetterResolved = ResolveFnPtrTypes<decltype(Getter)>;
 
-        static_assert(!std::is_same<typename SetterResolved::argType, std::false_type>::value,
+        static_assert(not std::is_same<typename SetterResolved::argType, std::false_type>::value,
             "Column template argument should be a pointer to a class method that sets the column data");
-        static_assert(std::is_same<typename SetterResolved::returnType, void>::value,
+        static_assert(std::is_void<typename SetterResolved::returnType>::value,
             "Column template argument should be a pointer to a class method that sets the column data. The return type should be `void`");
 
         static_assert(std::is_same<typename GetterResolved::argType, std::false_type>::value,
             "Column template argument should be a pointer to a class method that gets the column data");
-        static_assert(!std::is_same<typename GetterResolved::returnType, void>::value,
+        static_assert(not std::is_void<typename GetterResolved::returnType>::value,
             "Column template argument should be a pointer to a class method that gets the column data. The return type should not be `void`");
 
         static_assert(std::is_same<typename GetterResolved::returnType, typename SetterResolved::argType>::value,
@@ -108,6 +112,7 @@ namespace zxorm {
         public:
         using MemberType = typename SetterResolved::argType;
         using ObjectClass = typename SetterResolved::klass;
+        static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
         static constexpr const char* name() { return columnName.value; }
         static auto getter(auto obj) { return (obj.*Getter)(); };
         static void setter(auto obj, auto arg) { (obj.*Setter)(arg); };

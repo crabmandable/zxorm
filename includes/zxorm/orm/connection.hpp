@@ -7,11 +7,16 @@
 #include <sstream>
 #include <memory>
 #include <optional>
+#include <type_traits>
+#include <utility>
 
 namespace zxorm {
     template <class... Table>
     requires(sizeof...(Table) > 0)
     class Connection {
+    private:
+        friend class Statement<Connection, Table...>;
+        using statement_t = Statement<Connection, Table...>;
     public:
         static Maybe<Connection<Table...>> create(const char* fileName, int flags = 0, const char* zVfs = nullptr, Logger logger = nullptr) {
             if (!flags) {
@@ -72,16 +77,29 @@ namespace zxorm {
             return error;
         }
 
-        template<class T, typename PrimaryKeyType=int>
-        std::optional<Error> Find(PrimaryKeyType id) {
-            (void)id;
-            return std::nullopt;
+        template<class T, typename PrimaryKeyType>
+        Maybe<T> Find(PrimaryKeyType id) {
+            constexpr int idx = IndexOfFirst<std::is_same<T, typename Table::ObjectClass>::value...>::value;
+            static_assert(idx >= 0, "Connection does not contain any table matching the type T");
+            using table = std::tuple_element<idx, std::tuple<Table...>>;
+
+            static_assert(std::is_convertible<PrimaryKeyType, typename table::PrimaryKey::ObjectClass>::value,
+                    "Primary key type does not match the type specified in the definition of the table");
+
+
+            auto query = table::findQuery();
+            statement_t s = {this, query};
+            auto err = s.bind(1, &id, sizeof(id));
+            if (err) {
+                return err;
+            }
+            err = s.step();
+            if (err) {
+                return err;
+            }
         }
 
     private:
-        friend class Statement<Connection, Table...>;
-        using statement_t = Statement<Connection, Table...>;
-
         Connection(const Connection&) = delete;
         Connection operator =(const Connection&) = delete;
         Connection(sqlite3* db_handle, Logger logger) : _db_handle(db_handle) {

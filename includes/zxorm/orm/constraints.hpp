@@ -3,6 +3,7 @@
 #include "zxorm/common.hpp"
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 namespace zxorm {
     enum class conflict_t {
@@ -124,6 +125,18 @@ namespace zxorm {
 
     template<conflict_t onConflict=conflict_t::abort>
         using PrimaryKeyDesc = ConstraintWithConflictClause<"PRIMARY KEY DESC", onConflict>;
+
+    template <typename T>
+    struct ConstraintIsPrimaryKey : std::false_type { };
+
+    template<auto T>
+    struct ConstraintIsPrimaryKey<PrimaryKey<T>> : std::true_type {};
+
+    template<auto T>
+    struct ConstraintIsPrimaryKey<PrimaryKeyAsc<T>> : std::true_type {};
+
+    template<auto T>
+    struct ConstraintIsPrimaryKey<PrimaryKeyDesc<T>> : std::true_type {};
 
     //TODO add `CHECK` constraint
 };

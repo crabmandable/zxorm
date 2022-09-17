@@ -2,6 +2,7 @@
 #include <iostream>
 #include <optional>
 #include <algorithm>
+#include <utility>
 #include "zxorm/common.hpp"
 #include "zxorm/orm/types.hpp"
 #include "zxorm/orm/column.hpp"
@@ -23,6 +24,10 @@ class Table {
         }
 
         static constexpr int nColumns = std::tuple_size<std::tuple<Column...>>();
+        static constexpr bool hasPrimaryKey = AnyOf<Column::isPrimaryKey...>;
+        static constexpr size_t primaryKeyIndex = IndexOfFirst<Column::isPrimaryKey...>::value;
+        using PrimaryKey = std::tuple_element<primaryKeyIndex, std::tuple<Column...>>;
+        using ObjectClass = T;
 
         static std::string createTableQuery(bool ifNotExist) {
             std::stringstream query;
@@ -46,6 +51,14 @@ class Table {
             qstr.erase(qstr.end() - 2);
 
             return qstr + " );\n";
+        }
+
+        static std::string findQuery() {
+            std::ostringstream ss;
+            ss << "SELECT * FROM `" << tableName.value << "` "
+                << "WHERE `" << PrimaryKey::name() << "` = ?;";
+
+            return ss.str();
         }
 };
 
