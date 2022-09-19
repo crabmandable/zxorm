@@ -72,16 +72,22 @@ namespace zxorm {
     struct IndexOfFirst {
         private:
         static constexpr int _impl() {
-            int i = 0;
-            int idx = -1;
-            ([&]{
-                i++;
-                if (T) idx = i;
-            }(), ...);
+            constexpr std::array<bool, sizeof...(T)> a{T...};
+            const auto it = std::find(a.begin(), a.end(), true);
 
-            return idx;
+            // As we are in constant expression, we will have compilation error.
+            if (it == a.end()) return -1;
+
+            return std::distance(a.begin(), it);
         }
+
         public:
         static constexpr int value = _impl();
     };
+
+    template<typename T>
+    concept BackInsertable = requires(T t) {
+        requires std::is_same_v<std::back_insert_iterator<T>, decltype(std::back_inserter(t))>;
+    };
+
 };

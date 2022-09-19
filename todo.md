@@ -27,3 +27,6 @@
 
 * Tests:
     * Constraints
+
+FIX:
+    duplicate column class

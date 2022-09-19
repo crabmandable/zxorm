@@ -29,14 +29,18 @@ namespace zxorm {
         };
 
         public:
+        static constexpr bool publicColumn = true;
         using MemberType = typename FindColumnType<decltype(M)>::type;
         static_assert(!std::is_same<MemberType, std::false_type>::value, "Column template argument should be a pointer to a class member");
         using ObjectClass = typename FindColumnType<decltype(M)>::klass;
+        static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
+
         static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
+        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && SQLMemberType == sql_type_t::INTEGER;
 
         static constexpr const char* name() { return columnName.value; }
-        static auto getter(auto obj) { return obj.*M; };
-        static void setter(auto obj, auto arg) { obj.*M = arg; };
+        static auto& getter(auto& obj) { return obj.*M; };
+        static void setter(auto& obj, auto arg) { obj.*M = arg; };
 
         static std::string creationConstraints() {
             std::ostringstream ss;
@@ -51,7 +55,6 @@ namespace zxorm {
             return qstr;
         }
 
-        static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
 
     };
 
@@ -110,12 +113,17 @@ namespace zxorm {
                 "Column template arguments should be a pointers to class methods that get and set the column data");
 
         public:
+        static constexpr bool publicColumn = false;
         using MemberType = typename SetterResolved::argType;
+        static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
         using ObjectClass = typename SetterResolved::klass;
+
         static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
+        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && SQLMemberType == sql_type_t::INTEGER;
+
         static constexpr const char* name() { return columnName.value; }
-        static auto getter(auto obj) { return (obj.*Getter)(); };
-        static void setter(auto obj, auto arg) { (obj.*Setter)(arg); };
+        static auto& getter(auto& obj) { return (obj.*Getter)(); };
+        static void setter(auto& obj, auto arg) { (obj.*Setter)(arg); };
 
         static std::string creationConstraints() {
             std::stringstream ss;
@@ -131,8 +139,6 @@ namespace zxorm {
 
             return qstr;
         }
-
-        static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
     };
 
 };

@@ -77,29 +77,124 @@ namespace zxorm {
             return error;
         }
 
-        template<class T, typename PrimaryKeyType>
-        Maybe<T> Find(PrimaryKeyType id) {
-            constexpr int idx = IndexOfFirst<std::is_same<T, typename Table::ObjectClass>::value...>::value;
-            static_assert(idx >= 0, "Connection does not contain any table matching the type T");
-            using table = std::tuple_element<idx, std::tuple<Table...>>;
+        template<class T>
+        std::optional<Error> insert(const T& record) {
+            using table_t = typename TableForClass<T>::type;
 
-            static_assert(std::is_convertible<PrimaryKeyType, typename table::PrimaryKey::ObjectClass>::value,
-                    "Primary key type does not match the type specified in the definition of the table");
-
-
-            auto query = table::findQuery();
+            auto query = table_t::insertQuery();
             statement_t s = {this, query};
-            auto err = s.bind(1, &id, sizeof(id));
+            if (s.error) {
+                return s.error.value();
+            }
+
+            int i = 1;
+            std::optional<Error> err;
+            std::apply([&](const auto&... a) {
+                ([&]() {
+                    if (err) return;
+                    using column_t = std::remove_reference_t<decltype(a)>;
+
+                    // TODO check that this bind makes sense
+                    // what about non-trivial types?
+
+                    if constexpr (!column_t::isAutoIncColumn) {
+                        auto& val = column_t::getter(record);
+
+                        if constexpr (std::is_arithmetic_v<T>) {
+                            err = s.bind(i++, val);
+                        } else {
+                            err = s.bind(i++, &val, sizeof(val));
+                        }
+                    }
+
+                }(), ...);
+            }, typename table_t::columns_t{});
+
             if (err) {
                 return err;
             }
+
             err = s.step();
             if (err) {
                 return err;
             }
+
+            if (!s.done) {
+                return Error("Insert query didn't run to completion");
+            }
+
+            // TODO: fill the records primary key if needed
+
+            return std::nullopt;
+        }
+
+        template<class T, typename PrimaryKeyType>
+        Maybe<std::optional<T>> find(const PrimaryKeyType& id)
+        {
+            using table_t = typename TableForClass<T>::type;
+
+            static_assert(table_t::hasPrimaryKey, "Cannot execute a find on a table without a primary key");
+
+            static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::PrimaryKey::MemberType>,
+                    "Primary key type does not match the type specified in the definition of the table");
+
+            typename table_t::PrimaryKey::MemberType pk = id;
+            auto query = table_t::findQuery();
+            statement_t s = {this, query};
+            if (s.error) {
+                return s.error.value();
+            }
+            std::optional<Error> err;
+            if constexpr (std::is_arithmetic_v<PrimaryKeyType>) {
+                err = s.bind(1, pk);
+            } else {
+                // TODO Fix this bind
+                err = s.bind(1 &pk, sizeof(pk));
+            }
+            /* err = s.bind(1, pk); */
+            if (err) {
+                return err.value();
+            }
+            err = s.step();
+            if (err) {
+                return err.value();
+            }
+
+            if (s.done) {
+                return std::nullopt;
+            }
+
+            if (s.columnCount != table_t::nColumns) {
+                return Error("Unexpected number of columns returned by find query");
+            }
+
+            T record;
+            size_t columnIdx = 0;
+            std::apply([&](const auto&... a) {
+                ([&]() {
+                    using column_t = std::remove_reference_t<decltype(a)>;
+                    if constexpr (column_t::publicColumn) {
+                        s.readColumn(columnIdx++, column_t::getter(record));
+                    } else {
+                        using value_t = typename column_t::MemberType;
+                        value_t value;
+                        s.readColumn(columnIdx++, value);
+                        column_t::setter(record, value);
+                    }
+                }(), ...);
+            }, typename table_t::columns_t{});
+
+            return record;
         }
 
     private:
+        template<class C>
+        struct TableForClass {
+            static constexpr int idx = IndexOfFirst<std::is_same<C, typename Table::ObjectClass>::value...>::value;
+            static_assert(idx >= 0, "Connection does not contain any table matching the type T");
+            using type = typename std::tuple_element<idx, std::tuple<Table...>>::type;
+        };
+
         Connection(const Connection&) = delete;
         Connection operator =(const Connection&) = delete;
         Connection(sqlite3* db_handle, Logger logger) : _db_handle(db_handle) {
