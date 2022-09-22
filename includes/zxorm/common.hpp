@@ -86,8 +86,28 @@ namespace zxorm {
     };
 
     template<typename T>
-    concept BackInsertable = requires(T t) {
-        requires std::is_same_v<std::back_insert_iterator<T>, decltype(std::back_inserter(t))>;
-    };
+    struct is_vector : std::false_type  { };
+    template<typename T, typename A>
+    struct is_vector<std::vector<T, A>> : std::true_type {};
 
+    template<typename T>
+    struct is_basic_string : std::false_type  { };
+    template<typename CharT, typename Traits, typename Allocator>
+    struct is_basic_string<std::basic_string<CharT, Traits, Allocator>> : std::true_type {};
+
+    template<typename T>
+    struct is_array : std::false_type  { };
+    template<typename T, auto s>
+    struct is_array<std::array<T, s>> : std::true_type {};
+
+    template<typename T>
+    static constexpr bool IsContinuousContainer() {
+        return is_vector<T>::value || is_basic_string<T>::value || is_array<T>::value;
+    }
+
+    template<typename T>
+    concept ContinuousContainer = IsContinuousContainer<T>();
+
+    template<typename T>
+    concept ArithmeticT = std::is_arithmetic_v<T>;
 };

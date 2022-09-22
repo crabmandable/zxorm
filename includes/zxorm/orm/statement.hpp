@@ -53,9 +53,8 @@ namespace zxorm {
         bool done = false;
 
 
-        template <typename T>
+        template <ArithmeticT T>
         std::optional<Error> bind(size_t idx, const T& param)
-        requires (std::is_arithmetic_v<T>)
         {
             int result;
             if constexpr (std::is_floating_point_v<T>) {
@@ -75,14 +74,17 @@ namespace zxorm {
             return std::nullopt;
         }
 
-        std::optional<Error> bind(size_t idx, const void* data, size_t len) {
-            int result = sqlite3_bind_blob(stmt, idx, data, len, nullptr);
+        template <ContinuousContainer T>
+        std::optional<Error> bind(size_t idx, const T& param)
+        {
+            int result = sqlite3_bind_blob(stmt, idx, param.data(), param.size() * sizeof(typename T::value_type), nullptr);
             if (result != SQLITE_OK) {
                 conn->_logger(LogLevel::Error, "Unable to bind parameter to statement");
                 return Error("Unable to bind parameter to statment", result);
             }
-            std::cout << "Bind " << len << "\n";
+
             isBound[idx] = true;
+
             return std::nullopt;
         }
 
@@ -122,7 +124,7 @@ namespace zxorm {
             if (done) {
                 return Error("Query has run to completion");
             }
-            if (std::any_of(isBound.begin(), isBound.end(),
+            if (std::any_of(isBound.cbegin(), isBound.cend(),
                         [](const auto& bound) { return !bound.second; } )) {
                 return Error("Some parameters have not been bound");
             }
@@ -160,7 +162,7 @@ namespace zxorm {
                 case SQLITE_BLOB: {
                     const void* data = sqlite3_column_blob(stmt, idx);
                     size_t len = sqlite3_column_bytes(stmt, idx);
-                    if constexpr (BackInsertable<decltype(value)>) {
+                    if constexpr (IsContinuousContainer<decltype(value)>()) {
                         std::copy(data, (uint8_t*)data + len, std::back_inserter(value));
                     } else if constexpr (std::has_unique_object_representations_v<T> && std::is_trivial_v<T>) {
                         size_t toCopy = std::min(sizeof(T),  len);

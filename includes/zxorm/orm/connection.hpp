@@ -99,12 +99,7 @@ namespace zxorm {
 
                     if constexpr (!column_t::isAutoIncColumn) {
                         auto& val = column_t::getter(record);
-
-                        if constexpr (std::is_arithmetic_v<T>) {
-                            err = s.bind(i++, val);
-                        } else {
-                            err = s.bind(i++, &val, sizeof(val));
-                        }
+                        err = s.bind(i++, val);
                     }
 
                 }(), ...);
@@ -144,14 +139,7 @@ namespace zxorm {
             if (s.error) {
                 return s.error.value();
             }
-            std::optional<Error> err;
-            if constexpr (std::is_arithmetic_v<PrimaryKeyType>) {
-                err = s.bind(1, pk);
-            } else {
-                // TODO Fix this bind
-                err = s.bind(1 &pk, sizeof(pk));
-            }
-            /* err = s.bind(1, pk); */
+            std::optional<Error> err = s.bind(1, pk);
             if (err) {
                 return err.value();
             }
