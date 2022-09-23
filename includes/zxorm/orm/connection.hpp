@@ -94,9 +94,6 @@ namespace zxorm {
                     if (err) return;
                     using column_t = std::remove_reference_t<decltype(a)>;
 
-                    // TODO check that this bind makes sense
-                    // what about non-trivial types?
-
                     if constexpr (!column_t::isAutoIncColumn) {
                         auto& val = column_t::getter(record);
                         err = s.bind(i++, val);
@@ -160,17 +157,22 @@ namespace zxorm {
             size_t columnIdx = 0;
             std::apply([&](const auto&... a) {
                 ([&]() {
+                    if (err) return;
                     using column_t = std::remove_reference_t<decltype(a)>;
                     if constexpr (column_t::publicColumn) {
-                        s.readColumn(columnIdx++, column_t::getter(record));
+                        err = s.readColumn(columnIdx++, column_t::getter(record));
                     } else {
                         using value_t = typename column_t::MemberType;
                         value_t value;
-                        s.readColumn(columnIdx++, value);
+                        err = s.readColumn(columnIdx++, value);
                         column_t::setter(record, value);
                     }
                 }(), ...);
             }, typename table_t::columns_t{});
+
+            if (err) {
+                return err.value();
+            }
 
             return record;
         }

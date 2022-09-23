@@ -96,18 +96,32 @@ namespace zxorm {
     struct is_basic_string<std::basic_string<CharT, Traits, Allocator>> : std::true_type {};
 
     template<typename T>
+    struct remove_optional : std::type_identity<T> {};
+    template<typename T>
+    struct remove_optional<std::optional<T>> : std::type_identity<T> {};
+
+    template<typename T>
     struct is_array : std::false_type  { };
     template<typename T, auto s>
     struct is_array<std::array<T, s>> : std::true_type {};
 
     template<typename T>
     static constexpr bool IsContinuousContainer() {
-        return is_vector<T>::value || is_basic_string<T>::value || is_array<T>::value;
+        using plain = remove_optional<std::remove_const_t<T>>::type;
+        return is_vector<plain>::value || is_basic_string<plain>::value || is_array<plain>::value;
     }
 
     template<typename T>
     concept ContinuousContainer = IsContinuousContainer<T>();
 
     template<typename T>
-    concept ArithmeticT = std::is_arithmetic_v<T>;
+    concept ArithmeticT = std::is_arithmetic_v<T> || std::is_arithmetic_v<remove_optional<T>::type>;
+
+    template<typename T>
+    struct is_optional : std::false_type  { };
+    template<typename T>
+    struct is_optional<std::optional<T>> : std::true_type {};
+
+    template<typename T>
+    concept OptionalT = is_optional<T>::value;
 };

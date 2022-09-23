@@ -7,6 +7,7 @@
 #include <iterator>
 #include <optional>
 #include <type_traits>
+#include "zxorm/helpers/meta_container.hpp"
 
 namespace zxorm {
     template <class Connection, class... Table>
@@ -54,18 +55,35 @@ namespace zxorm {
 
 
         template <ArithmeticT T>
-        std::optional<Error> bind(size_t idx, const T& param)
+        [[nodiscard]] std::optional<Error> bind(size_t idx, const T& param)
         {
             int result;
-            if constexpr (std::is_floating_point_v<T>) {
-                result = sqlite3_bind_double(stmt, idx, param);
-            } else {
-                if (sizeof(T) <= 4) {
-                    result = sqlite3_bind_int(stmt, idx, param);
+            bool boundNull = false;
+
+            const typename remove_optional<T>::type* unwrapped;
+            if constexpr (is_optional<T>::value) {
+                if (!param.has_value()) {
+                    result = sqlite3_bind_null(stmt, idx);
+                    boundNull = true;
                 } else {
-                    result = sqlite3_bind_int64(stmt, idx, param);
+                    unwrapped = &param.value();
+                }
+            } else {
+                unwrapped = &param;
+            }
+
+            if (!boundNull) {
+                if constexpr (std::is_floating_point_v<T>) {
+                    result = sqlite3_bind_double(stmt, idx, *unwrapped);
+                } else {
+                    if (sizeof(T) <= 4) {
+                        result = sqlite3_bind_int(stmt, idx, *unwrapped);
+                    } else {
+                        result = sqlite3_bind_int64(stmt, idx, *unwrapped);
+                    }
                 }
             }
+
             if (result != SQLITE_OK) {
                 conn->_logger(LogLevel::Error, "Unable to bind parameter to statement");
                 return Error("Unable to bind parameter to statment", result);
@@ -75,9 +93,24 @@ namespace zxorm {
         }
 
         template <ContinuousContainer T>
-        std::optional<Error> bind(size_t idx, const T& param)
+        [[nodiscard]] std::optional<Error> bind(size_t idx, const T& param)
         {
-            int result = sqlite3_bind_blob(stmt, idx, param.data(), param.size() * sizeof(typename T::value_type), nullptr);
+            bool boundNull = false;
+            int result;
+
+            if constexpr (is_optional<T>::value) {
+                if (!param.has_value()) {
+                    result = sqlite3_bind_null(stmt, idx);
+                    boundNull = true;
+                }
+            }
+
+            if (!boundNull) {
+                const auto paramToBind = MetaContainer<const T>(param);
+                constexpr size_t elSize = sizeof(typename remove_optional<T>::type::value_type);
+                result = sqlite3_bind_blob(stmt, idx, paramToBind.data(), paramToBind.size() * elSize, nullptr);
+            }
+
             if (result != SQLITE_OK) {
                 conn->_logger(LogLevel::Error, "Unable to bind parameter to statement");
                 return Error("Unable to bind parameter to statment", result);
@@ -88,16 +121,7 @@ namespace zxorm {
             return std::nullopt;
         }
 
-        std::optional<Error> bind(const char* paramName, const void* data, size_t len) {
-            int idx = sqlite3_bind_parameter_index(stmt, paramName);
-            if (idx <= 0) {
-                conn->_logger(LogLevel::Error, "Unable to bind parameter to statement, name not found");
-                return Error("Unable to bind parameter to statment, name not found");
-            }
-            return bind(idx, data, len);
-        }
-
-        std::optional<Error> rewind() {
+        [[nodiscard]] std::optional<Error> rewind() {
             int result = sqlite3_reset(stmt);
             if (result != SQLITE_OK) {
                 conn->_logger(LogLevel::Error, "Unable to reset statment");
@@ -106,7 +130,7 @@ namespace zxorm {
             done = false;
         }
 
-        std::optional<Error> reset() {
+        [[nodiscard]] std::optional<Error> reset() {
             auto err = rewind();
             if (err) return err;
 
@@ -120,7 +144,7 @@ namespace zxorm {
             return std::nullopt;
         }
 
-        std::optional<Error> step() {
+        [[nodiscard]] std::optional<Error> step() {
             if (done) {
                 return Error("Query has run to completion");
             }
@@ -142,49 +166,81 @@ namespace zxorm {
             return std::nullopt;
         }
 
-        template<typename T>
-        void readColumn(size_t idx, T& value) {
+        template<ContinuousContainer T>
+        [[nodiscard]] std::optional<Error> readColumn(size_t idx, T& outParam) {
+            auto out = MetaContainer<T>(outParam);
             int dataType = sqlite3_column_type(stmt, idx);
             switch(dataType) {
-                case SQLITE_INTEGER: {
-                    if (sizeof(value) <= 4) {
-                        value = sqlite3_column_int(stmt, idx);
-                    } else {
-                        value = sqlite3_column_int64(stmt, idx);
-                    }
-                    break;
-                }
+                case SQLITE_INTEGER:
                 case SQLITE_FLOAT: {
-                    value = sqlite3_column_double(stmt, idx);
-                    break;
+                    return Error("Tried to read an arithmetic column into a container");
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
                     const void* data = sqlite3_column_blob(stmt, idx);
                     size_t len = sqlite3_column_bytes(stmt, idx);
-                    if constexpr (IsContinuousContainer<decltype(value)>()) {
-                        std::copy(data, (uint8_t*)data + len, std::back_inserter(value));
-                    } else if constexpr (std::has_unique_object_representations_v<T> && std::is_trivial_v<T>) {
-                        size_t toCopy = std::min(sizeof(T),  len);
-                        std::memcpy(&value, data, toCopy);
-                    } else {
-                        static_assert(std::is_same_v<typename std::type_identity<T>::type, T>,
-                                "Type of column passed to read column doesn't make sense to read from a blob");
+                    if (!out.resize(len)) {
+                        return Error("Container does not have enough space to read column data");
                     }
+                    std::memcpy(out.data(), data, len);
                     break;
                 }
                 case SQLITE_NULL: {
-                    if constexpr (requires { value.clear(); }) {
-                        value.clear();
+                    out.clear();
+                    break;
+                }
+                default: {
+                    // this should never happen :pray:
+                    assert(false);
+                    return Error("Unknown SQL type encountered, something isn't implemented yet");
+                }
+            }
+            return std::nullopt;
+        }
+
+        template<ArithmeticT T>
+        [[nodiscard]] std::optional<Error> readColumn(size_t idx, T& outParam) {
+            int dataType = sqlite3_column_type(stmt, idx);
+            switch(dataType) {
+                case SQLITE_INTEGER: {
+                    if (sizeof(outParam) <= 4) {
+                        outParam = sqlite3_column_int(stmt, idx);
+                    } else {
+                        outParam = sqlite3_column_int64(stmt, idx);
+                    }
+                    break;
+                }
+                case SQLITE_FLOAT: {
+                    outParam = sqlite3_column_double(stmt, idx);
+                    break;
+                }
+                case SQLITE_TEXT:
+                case SQLITE_BLOB: {
+                    return Error("Tried to read an arithmetic column into a container");
+                    size_t len = sqlite3_column_bytes(stmt, idx);
+                    if (len > sizeof(T)) {
+                        return Error("Param does not have enough space to fit column contents");
+                    }
+                    const void* data = sqlite3_column_blob(stmt, idx);
+                    std::memcpy(&outParam, data, len);
+                    break;
+                }
+                case SQLITE_NULL: {
+                    if constexpr (is_optional<T>::value) {
+                        outParam = std::nullopt;
+                    } else {
+                        outParam = 0;
                     }
                     break;
                 }
                 default: {
                     // this should never happen :pray:
                     assert(false);
-                    break;
+                    return Error("Unknown SQL type encountered, something isn't implemented yet");
                 }
             }
+
+            return std::nullopt;
         }
     };
 };
