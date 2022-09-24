@@ -10,13 +10,17 @@ struct Object {
     int someId = 0;
     std::string someText;
     float someFloat;
+    std::optional<float> someOptional;
+    std::optional<std::vector<char>> someOptionalBuffer;
 };
 
 using table_t = Table<"test", Object,
     Column<"id", &Object::id, PrimaryKey<conflict_t::abort>>,
     Column<"text", &Object::someText, Unique<conflict_t::replace>>,
     Column<"float", &Object::someFloat>,
-    Column<"someId", &Object::someId >
+    Column<"someId", &Object::someId >,
+    Column<"someOptional", &Object::someOptional>,
+    Column<"someOptionaBuffer", &Object::someOptionalBuffer>
         >;
 
 using MyConnection = Connection<table_t>;
@@ -116,7 +120,42 @@ TEST_F(QueryTest, FindSomething) {
         ASSERT_TRUE(record);
         ASSERT_EQ(record.value().id, 1);
         ASSERT_EQ(record.value().someText, "Some text");
-        ASSERT_EQ(record.value().someFloat, 3.14);
-        ASSERT_EQ(record.value().someId, 37);
+        ASSERT_FLOAT_EQ(record.value().someFloat, 3.14);
+        ASSERT_EQ(record.value().someId, 42);
+        ASSERT_FALSE(record.value().someOptional.has_value());
+        ASSERT_FALSE(record.value().someOptionalBuffer.has_value());
+    }
+}
+
+TEST_F(QueryTest, FindSomethingWithOptionalsFilled) {
+    auto err = myConn->createTables(true);
+    ASSERT_FALSE(err);
+
+    Object obj;
+    obj.someText = "Some text";
+    obj.someFloat = 3.14;
+    obj.someId = 42;
+    obj.someOptional = 42.333;
+    obj.someOptionalBuffer = {'y', 'o'};
+
+    err = myConn->insert(obj);
+    ASSERT_FALSE(err);
+
+    auto result = myConn->find<Object>(1);
+    if (std::holds_alternative<Error>(result)) {
+        auto err = std::get<Error>(result);
+        std::cout << std::string(err) << std::endl;
+        ASSERT_FALSE(true);
+    } else {
+        auto record = std::get<std::optional<Object>>(result);
+        ASSERT_TRUE(record);
+        ASSERT_EQ(record.value().id, 1);
+        ASSERT_EQ(record.value().someText, "Some text");
+        ASSERT_FLOAT_EQ(record.value().someFloat, 3.14);
+        ASSERT_EQ(record.value().someId, 42);
+        ASSERT_TRUE(record.value().someOptional.has_value());
+        ASSERT_FLOAT_EQ(record.value().someOptional.value(), 42.333);
+        auto expectedBuff = std::vector<char> {'y', 'o'};
+        ASSERT_EQ(record.value().someOptionalBuffer.value(), expectedBuff);
     }
 }

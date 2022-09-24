@@ -5,7 +5,7 @@
 
 namespace zxorm {
     template<ContinuousContainer C>
-    requires(not is_optional<C>::value)
+    requires(not OptionalT<C>)
     [[nodiscard]] bool safeResize(C& container, auto size) {
         if constexpr (requires { container.resize(size); }) {
             container.resize(size);
@@ -62,11 +62,11 @@ namespace zxorm {
     };
 
     template<ContinuousContainer C>
-    requires(is_optional<C>::value)
+    requires(OptionalT<C>)
     class MetaContainer<C> {
         private:
         C& container;
-        using PlainC = typename remove_optional<C>::type;
+        using PlainC = remove_optional<std::remove_cvref_t<C>>::type;
 
         public:
         MetaContainer(C& c) : container{c} {}
@@ -83,7 +83,7 @@ namespace zxorm {
         [[nodiscard]] bool resize(SizeT len) {
             if (!container.has_value()) container = PlainC{};
             auto& value = container.value();
-            return safeResize(container, value);
+            return safeResize(value, len);
         }
 
         void clear() {
@@ -95,7 +95,7 @@ namespace zxorm {
             return container.value().size();
         }
 
-        auto data () const -> decltype(std::declval<PlainC>().data()) {
+        auto data () const -> decltype(std::declval<const PlainC>().data()) {
             if (!container.has_value()) {
                 return nullptr;
             }

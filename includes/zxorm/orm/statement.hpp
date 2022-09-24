@@ -57,11 +57,11 @@ namespace zxorm {
         template <ArithmeticT T>
         [[nodiscard]] std::optional<Error> bind(size_t idx, const T& param)
         {
+            using unwrapped_t = typename remove_optional<T>::type;
+            const unwrapped_t* unwrapped;
             int result;
             bool boundNull = false;
-
-            const typename remove_optional<T>::type* unwrapped;
-            if constexpr (is_optional<T>::value) {
+            if constexpr (IsOptional<T>()) {
                 if (!param.has_value()) {
                     result = sqlite3_bind_null(stmt, idx);
                     boundNull = true;
@@ -73,7 +73,7 @@ namespace zxorm {
             }
 
             if (!boundNull) {
-                if constexpr (std::is_floating_point_v<T>) {
+                if constexpr (std::is_floating_point_v<unwrapped_t>) {
                     result = sqlite3_bind_double(stmt, idx, *unwrapped);
                 } else {
                     if (sizeof(T) <= 4) {
@@ -98,7 +98,7 @@ namespace zxorm {
             bool boundNull = false;
             int result;
 
-            if constexpr (is_optional<T>::value) {
+            if constexpr (IsOptional<T>()) {
                 if (!param.has_value()) {
                     result = sqlite3_bind_null(stmt, idx);
                     boundNull = true;
@@ -226,7 +226,7 @@ namespace zxorm {
                     break;
                 }
                 case SQLITE_NULL: {
-                    if constexpr (is_optional<T>::value) {
+                    if constexpr (IsOptional<T>()) {
                         outParam = std::nullopt;
                     } else {
                         outParam = 0;
