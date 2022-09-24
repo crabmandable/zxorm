@@ -147,4 +147,19 @@ namespace zxorm {
         using plain = remove_optional<std::remove_cvref_t<T>>::type;
         return is_string<plain>::value;
     }
+
+    // unqiue tuple https://stackoverflow.com/a/57528226
+    namespace __unique_tuple_detail {
+        template <typename T, typename... Ts>
+        struct unique : std::type_identity<T> {};
+
+        template <typename... Ts, typename U, typename... Us>
+        struct unique<std::tuple<Ts...>, U, Us...>
+            : std::conditional_t<(std::is_same_v<U, Ts> || ...)
+                               , unique<std::tuple<Ts...>, Us...>
+                               , unique<std::tuple<Ts..., U>, Us...>> {};
+    };
+
+    template <typename... Ts>
+    using unique_tuple = typename __unique_tuple_detail::unique<std::tuple<>, Ts...>::type;
 };

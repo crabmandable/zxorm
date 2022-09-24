@@ -52,7 +52,7 @@ class Table {
                 query << '\t' << "`" << Column::name() << "` "
                     << sqlTypeStr(Column::SQLMemberType);
 
-                auto constraints = Column::creationConstraints();
+                auto constraints = Column::constraintCreationQuery();
                 if (!constraints.empty()) {
                     query << " " << constraints;
                 }

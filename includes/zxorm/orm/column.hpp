@@ -7,6 +7,36 @@
 
 namespace zxorm {
 
+    namespace __constraint_t_detail {
+        template <typename MemberT, typename... C>
+        struct constraints_t {
+            using type = unique_tuple<C...>;
+        };
+
+        template <typename MemberT, typename... C>
+        requires (not is_optional<MemberT>::value)
+        struct constraints_t<MemberT, C...> {
+            using type = unique_tuple<NotNull<>, C...>;
+        };
+
+        static inline std::string constraintCreationQuery(auto constraints) {
+            std::stringstream ss;
+            std::apply([&] (const auto&... c) {
+                ([&](){
+                    ss << c << " ";
+                }(), ...);
+            }, constraints);
+
+            std::string qstr = ss.str();
+            // erase trailing comma
+            if (qstr.size() >= 2) {
+                qstr.erase(qstr.end() - 1);
+            }
+
+            return qstr;
+        }
+    };
+
     template <FixedLengthString columnName, auto M, class... Constraint>
     class Column {
         template< typename T >
@@ -33,6 +63,8 @@ namespace zxorm {
         using MemberType = typename FindColumnType<decltype(M)>::type;
         static_assert(!std::is_same<MemberType, std::false_type>::value, "Column template argument should be a pointer to a class member");
         using ObjectClass = typename FindColumnType<decltype(M)>::klass;
+        using constraints_t = typename __constraint_t_detail::constraints_t<MemberType, Constraint...>::type;
+
         static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
 
         static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
@@ -42,20 +74,9 @@ namespace zxorm {
         static auto& getter(auto& obj) { return obj.*M; };
         static void setter(auto& obj, auto arg) { obj.*M = arg; };
 
-        static std::string creationConstraints() {
-            std::ostringstream ss;
-            appendToStringStream<Constraint...>(ss, " ");
-
-            std::string qstr = ss.str();
-            // erase trailing comma
-            if (qstr.size() >= 2) {
-                qstr.erase(qstr.end() - 1);
-            }
-
-            return qstr;
+        static std::string constraintCreationQuery() {
+            return __constraint_t_detail::constraintCreationQuery(constraints_t{});
         }
-
-
     };
 
     template <FixedLengthString columnName, auto Getter, auto Setter, class... Constraint>
@@ -118,6 +139,7 @@ namespace zxorm {
         static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
         using ObjectClass = typename SetterResolved::klass;
 
+        using constraints_t = typename __constraint_t_detail::constraints_t<MemberType, Constraint...>::type;
         static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
         static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && SQLMemberType == sql_type_t::INTEGER;
 
@@ -125,19 +147,8 @@ namespace zxorm {
         static auto& getter(auto& obj) { return (obj.*Getter)(); };
         static void setter(auto& obj, auto arg) { (obj.*Setter)(arg); };
 
-        static std::string creationConstraints() {
-            std::stringstream ss;
-            ([&] {
-                ss << Constraint::query() << ",";
-            }(), ...);
-
-            std::string qstr = ss.str();
-            // erase trailing comma
-            if (qstr.size() >= 2) {
-                qstr.erase(qstr.end() - 1);
-            }
-
-            return qstr;
+        static std::string constraintCreationQuery() {
+            return __constraint_t_detail::constraintCreationQuery(constraints_t{});
         }
     };
 

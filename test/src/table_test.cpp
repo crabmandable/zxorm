@@ -103,7 +103,7 @@ TEST_F(TableTest, CreateTableQuery) {
     std::string query = table_t::createTableQuery(false);
     std::regex reg ("\\s+");
     auto trimmed = std::regex_replace (query, reg, " ");
-    ASSERT_EQ(trimmed, "CREATE TABLE test ( `id` INTEGER, `name` TEXT ); ");
+    ASSERT_EQ(trimmed, "CREATE TABLE test ( `id` INTEGER NOT NULL ON CONFLICT ABORT, `name` TEXT NOT NULL ON CONFLICT ABORT ); ");
     std::string same = tablepriv_t::createTableQuery(false);
     std::regex reg2 ("_private");
     same = std::regex_replace (same, reg2, "");
@@ -115,11 +115,11 @@ TEST_F(TableTest, CreateWithConstraintsTableQuery) {
     std::regex reg ("\\s+");
     auto trimmed = std::regex_replace (query, reg, " ");
     std::string expected = "CREATE TABLE test_constraints ( "
-        "`id` INTEGER PRIMARY KEY ON CONFLICT ABORT, "
+        "`id` INTEGER NOT NULL ON CONFLICT ABORT PRIMARY KEY ON CONFLICT ABORT, "
         "`name` TEXT NOT NULL ON CONFLICT ABORT UNIQUE ON CONFLICT ABORT, "
-        "`text` TEXT UNIQUE ON CONFLICT REPLACE, "
-        "`float` REAL, "
-        "`someId` INTEGER REFERENCES `test` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT "
+        "`text` TEXT NOT NULL ON CONFLICT ABORT UNIQUE ON CONFLICT REPLACE, "
+        "`float` REAL NOT NULL ON CONFLICT ABORT, "
+        "`someId` INTEGER NOT NULL ON CONFLICT ABORT REFERENCES `test` (`id`) ON UPDATE CASCADE ON DELETE RESTRICT "
         "); ";
     ASSERT_EQ(trimmed, expected);
 }

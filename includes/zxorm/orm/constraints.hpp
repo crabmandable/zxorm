@@ -81,6 +81,12 @@ namespace zxorm {
                     << " ON DELETE " << actionStr(onDelete);
                 return ss.str();
             }
+
+            friend std::ostream & operator<< (std::ostream &out, [[maybe_unused]] const ForeignKey& c)
+            {
+                out << to_string();
+                return out;
+            }
         };
 
     // TODO support default with expr
@@ -91,6 +97,12 @@ namespace zxorm {
                 ss << "DEFAULT '" << value.value << "'";
                 return ss.str();
             }
+
+            friend std::ostream & operator<< (std::ostream &out, [[maybe_unused]] const Default& c)
+            {
+                out << to_string();
+                return out;
+            }
         };
 
     template<FixedLengthString value>
@@ -100,6 +112,12 @@ namespace zxorm {
                 ss << "COLLATE " << value.value;
                 return ss.str();
             }
+
+            friend std::ostream & operator<< (std::ostream &out, [[maybe_unused]] const Collate& c)
+            {
+                out << to_string();
+                return out;
+            }
         };
 
     template<FixedLengthString constraint, conflict_t onConflict>
@@ -108,6 +126,13 @@ namespace zxorm {
                 std::stringstream ss;
                 ss << constraint.value << " ON CONFLICT " << conflictStr(onConflict);
                 return ss.str();
+            }
+
+            friend std::ostream & operator<< (std::ostream &out,
+                    [[maybe_unused]] const ConstraintWithConflictClause& c)
+            {
+                out << to_string();
+                return out;
             }
         };
 
