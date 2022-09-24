@@ -5,6 +5,20 @@
 
 namespace zxorm {
     template<ContinuousContainer C>
+    requires(not is_optional<C>::value)
+    [[nodiscard]] bool safeResize(C& container, auto size) {
+        if constexpr (requires { container.resize(size); }) {
+            container.resize(size);
+        } else {
+            if (container.size() < size) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    template<ContinuousContainer C>
     class MetaContainer {
         private:
         C& container;
@@ -13,51 +27,21 @@ namespace zxorm {
         public:
         MetaContainer(C& c) : container{c} {}
 
-        static constexpr bool isOptional = is_optional<C>::value;
-
         PlainC& value() {
-            if constexpr (isOptional) {
-                return container.value();
-            } else {
-                return container;
-            }
+            return container;
         }
 
         bool has_value() {
-            if constexpr (isOptional) {
-                return container.has_value();
-            } else {
-                return true;
-            }
-        }
-
-        // meta resize can fail if tyring to resize an array to something bigger than it is
-        // optional containers will be created with the size
-        template<typename SizeT>
-        [[nodiscard]] bool resize(SizeT len) {
-            PlainC* unwrapped;
-            if constexpr (isOptional) {
-                if (!container.has_value()) container = PlainC{};
-                unwrapped = &container.value();
-            } else {
-                unwrapped = &container;
-            }
-
-            if constexpr (requires { unwrapped->resize(len); }) {
-                unwrapped->resize(len);
-            } else {
-                if (unwrapped->size() < len) {
-                    return false;
-                }
-            }
-
             return true;
         }
 
+        template<typename SizeT>
+        [[nodiscard]] bool resize(SizeT len) {
+            return safeResize(container, len);
+        }
+
         void clear() {
-            if constexpr (isOptional) {
-                container = std::nullopt;
-            } else if constexpr (requires { container.clear(); }) {
+            if constexpr (requires { container.clear(); }) {
                 container.clear();
             } else {
                 std::fill_n(container.begin(), container.size(), 0);
@@ -65,31 +49,61 @@ namespace zxorm {
         }
 
         auto size () const -> decltype(std::declval<PlainC>().size()) {
-           if constexpr (isOptional) {
-               if (!container.has_value()) return 0;
-               return container.value().size();
-           } else {
-               return container.size();
-           }
+            return container.size();
         }
 
         auto data () const -> decltype(std::declval<PlainC>().data()) {
-           if constexpr (isOptional) {
-               if (!container.has_value()) {
-                   return nullptr;
-               }
-               return container.value().data();
-           } else {
-               return container.data();
-           }
+            return container.data();
         }
 
         auto data () -> decltype(std::declval<PlainC>().data()) {
-            if constexpr (isOptional) {
-                return container.value().data();
-            } else {
-                return container.data();
+            return container.data();
+        }
+    };
+
+    template<ContinuousContainer C>
+    requires(is_optional<C>::value)
+    class MetaContainer<C> {
+        private:
+        C& container;
+        using PlainC = typename remove_optional<C>::type;
+
+        public:
+        MetaContainer(C& c) : container{c} {}
+
+        PlainC& value() {
+            return container.value();
+        }
+
+        bool has_value() {
+            return container.has_value();
+        }
+
+        template<typename SizeT>
+        [[nodiscard]] bool resize(SizeT len) {
+            if (!container.has_value()) container = PlainC{};
+            auto& value = container.value();
+            return safeResize(container, value);
+        }
+
+        void clear() {
+            container = std::nullopt;
+        }
+
+        auto size () const -> decltype(std::declval<PlainC>().size()) {
+            if (!container.has_value()) return 0;
+            return container.value().size();
+        }
+
+        auto data () const -> decltype(std::declval<PlainC>().data()) {
+            if (!container.has_value()) {
+                return nullptr;
             }
+            return container.value().data();
+        }
+
+        auto data () -> decltype(std::declval<PlainC>().data()) {
+            return container.value().data();
         }
     };
 };
