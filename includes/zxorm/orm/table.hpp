@@ -16,11 +16,14 @@ template <FixedLengthString tableName, class T, ColumnBelongingToClass<T>... Col
 class Table {
     private:
         template <typename... C>
-        struct FindPrimaryKey : std::false_type { };
+        struct FindPrimaryKey {
+            static constexpr int primaryKeyIndex = -1;
+            using type = std::false_type;
+        };
 
         template <typename... C>
         requires AnyOf<Column::isPrimaryKey...>
-        struct FindPrimaryKey<C...> : std::false_type
+        struct FindPrimaryKey<C...>
         {
             static constexpr int primaryKeyIndex = IndexOfFirst<C::isPrimaryKey...>::value;
             using type = typename std::tuple_element<primaryKeyIndex, std::tuple<Column...>>::type;
@@ -50,7 +53,7 @@ class Table {
             query << tableName.value << " (\n";
             ([&] {
                 query << '\t' << "`" << Column::name() << "` "
-                    << sqlTypeStr(Column::SQLMemberType);
+                    << sqlTypeStr(Column::sqlColumnType);
 
                 auto constraints = Column::constraintCreationQuery();
                 if (!constraints.empty()) {

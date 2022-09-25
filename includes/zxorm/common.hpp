@@ -23,13 +23,18 @@ namespace zxorm {
         const char* err;
         int sqlite_result;
 
-        operator std::string () const {
-            std::ostringstream out;
-            out << std::string(err);
-            if (sqlite_result != SQLITE_OK) {
-                const char* sqlErr = sqlite3_errstr(sqlite_result);
+        friend std::ostream & operator<< (std::ostream &out, const Error& e) {
+            out << std::string(e.err);
+            if (e.sqlite_result != SQLITE_OK) {
+                const char* sqlErr = sqlite3_errstr(e.sqlite_result);
                 out <<": " + std::string(sqlErr);
             }
+            return out;
+        }
+
+        operator std::string () const {
+            std::ostringstream out;
+            out << *this;
             return out.str();
         }
     };
@@ -46,21 +51,17 @@ namespace zxorm {
         char value[N];
     };
 
-
-    template<typename... T>
-    auto appendToStringStream(std::ostringstream& ss, const char * delim) {
-        std::array<std::string, sizeof...(T)> strings = {T::to_string()...};
-        std::copy(strings.begin(), strings.end(),
-                std::ostream_iterator<std::string>(ss, delim));
-    }
-
-    template<FixedLengthString...string>
+    template<FixedLengthString delim, FixedLengthString...string>
     requires requires { (sizeof(string.value) + ...); }
-    void appendToStringStream(std::ostringstream& ss, const char * delim) {
-        std::array<std::string, sizeof...(string)> strings = {string.value...};
-        std::copy(strings.begin(), strings.end(),
-                std::ostream_iterator<std::string>(ss, delim));
-    }
+    struct AppendToStream {
+        friend std::ostream & operator<< (std::ostream &out, [[maybe_unused]] const AppendToStream& c)
+        {
+            std::array<std::string, sizeof...(string)> strings = {string.value...};
+            std::copy(strings.begin(), strings.end(),
+                    std::ostream_iterator<std::string>(out, delim.value));
+            return out;
+        }
+    };
 
     template<bool... T>
     static constexpr bool AnyOf = (... || T);
@@ -75,9 +76,7 @@ namespace zxorm {
             constexpr std::array<bool, sizeof...(T)> a{T...};
             const auto it = std::find(a.begin(), a.end(), true);
 
-            // As we are in constant expression, we will have compilation error.
             if (it == a.end()) return -1;
-
             return std::distance(a.begin(), it);
         }
 
@@ -106,9 +105,14 @@ namespace zxorm {
     struct is_array<std::array<T, s>> : std::true_type {};
 
     template<typename T>
+    struct is_optional : std::false_type  { };
+    template<typename T>
+    struct is_optional<std::optional<T>> : std::true_type {};
+
+    template<typename T>
     static constexpr bool IsContinuousContainer() {
         using plain = remove_optional<std::remove_cvref_t<T>>::type;
-        return is_vector<plain>::value || is_basic_string<plain>::value || is_array<plain>::value;
+        return is_vector<plain>() || is_basic_string<plain>() || is_array<plain>();
     }
 
     template<typename T>
@@ -124,28 +128,18 @@ namespace zxorm {
     concept ArithmeticT = IsArithmetic<T>();
 
     template<typename T>
-    struct is_optional : std::false_type  { };
-    template<typename T>
-    struct is_optional<std::optional<T>> : std::true_type {};
-
-    template<typename T>
     static constexpr bool IsOptional() {
         using plain = std::remove_cvref_t<T>;
-        return is_optional<plain>::value;
+        return is_optional<plain>();
     }
 
     template<typename T>
     concept OptionalT = IsOptional<T>();
 
-    template<typename T>
-    struct is_string : std::false_type  { };
-    template<typename CharT, typename Traits, typename Allocator>
-    struct is_string<std::basic_string<CharT, Traits, Allocator>> : std::true_type {};
-
     template <typename T>
     static constexpr bool IsString() {
         using plain = remove_optional<std::remove_cvref_t<T>>::type;
-        return is_string<plain>::value;
+        return is_basic_string<plain>();
     }
 
     // unqiue tuple https://stackoverflow.com/a/57528226

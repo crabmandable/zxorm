@@ -3,30 +3,26 @@
 
 namespace zxorm {
 
-    enum class sql_type_t {
-        INTEGER,
-        TEXT,
-        BLOB,
-        REAL,
-        NUMERIC,
+    enum class sqlite_column_type {
+        INTEGER = SQLITE_INTEGER,
+        TEXT = SQLITE_TEXT,
+        BLOB = SQLITE_BLOB,
+        REAL = SQLITE_FLOAT,
     };
 
-    static constexpr const char* sqlTypeStr(sql_type_t t) {
+    static constexpr const char* sqlTypeStr(sqlite_column_type t) {
         switch(t) {
-            case sql_type_t::INTEGER: {
+            case sqlite_column_type::INTEGER: {
                 return "INTEGER";
             }
-            case sql_type_t::TEXT: {
+            case sqlite_column_type::TEXT: {
                 return "TEXT";
             }
-            case sql_type_t::BLOB: {
+            case sqlite_column_type::BLOB: {
                 return "BLOB";
             }
-            case sql_type_t::REAL: {
+            case sqlite_column_type::REAL: {
                 return "REAL";
-            }
-            case sql_type_t::NUMERIC: {
-                return "NUMERIC";
             }
         }
 
@@ -58,18 +54,18 @@ namespace zxorm {
     template<typename T>
     struct MemberTypeToSQLType {
         private:
-        static constexpr sql_type_t findType() {
+        static constexpr sqlite_column_type findType() {
             using type = typename remove_optional<T>::type;
             if constexpr (IsArithmetic<type>()) {
                 if (std::is_floating_point_v<type>) {
-                    return sql_type_t::REAL;
+                    return sqlite_column_type::REAL;
                 } else {
-                    return sql_type_t::INTEGER;
+                    return sqlite_column_type::INTEGER;
                 }
             } else if constexpr (IsString<type>()) {
-                return sql_type_t::TEXT;
+                return sqlite_column_type::TEXT;
             } else if constexpr (IsContinuousContainer<type>()) {
-                return sql_type_t::BLOB;
+                return sqlite_column_type::BLOB;
             } else {
                 static_assert(std::is_same_v<T, std::false_type>,
                     "Member type is not convertable to an sql type. "
@@ -78,7 +74,7 @@ namespace zxorm {
             }
         }
         public:
-        static constexpr sql_type_t value = findType();
+        static constexpr sqlite_column_type value = findType();
     };
 
 };

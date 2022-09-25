@@ -14,7 +14,7 @@ namespace zxorm {
         };
 
         template <typename MemberT, typename... C>
-        requires (not is_optional<MemberT>::value)
+        requires (not IsOptional<MemberT>())
         struct constraints_t<MemberT, C...> {
             using type = unique_tuple<NotNull<>, C...>;
         };
@@ -65,10 +65,10 @@ namespace zxorm {
         using ObjectClass = typename FindColumnType<decltype(M)>::klass;
         using constraints_t = typename __constraint_t_detail::constraints_t<MemberType, Constraint...>::type;
 
-        static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
+        static constexpr sqlite_column_type sqlColumnType = MemberTypeToSQLType<MemberType>::value;
 
         static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
-        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && SQLMemberType == sql_type_t::INTEGER;
+        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && sqlColumnType == sqlite_column_type::INTEGER;
 
         static constexpr const char* name() { return columnName.value; }
         static auto& getter(auto& obj) { return obj.*M; };
@@ -136,12 +136,12 @@ namespace zxorm {
         public:
         static constexpr bool publicColumn = false;
         using MemberType = typename SetterResolved::argType;
-        static constexpr sql_type_t SQLMemberType = MemberTypeToSQLType<MemberType>::value;
+        static constexpr sqlite_column_type sqlColumnType = MemberTypeToSQLType<MemberType>::value;
         using ObjectClass = typename SetterResolved::klass;
 
         using constraints_t = typename __constraint_t_detail::constraints_t<MemberType, Constraint...>::type;
         static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
-        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && SQLMemberType == sql_type_t::INTEGER;
+        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && sqlColumnType == sqlite_column_type::INTEGER;
 
         static constexpr const char* name() { return columnName.value; }
         static auto& getter(auto& obj) { return (obj.*Getter)(); };
