@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
 #include "zxorm/orm/statement.hpp"
+#include "zxorm/result.hpp"
 #include <functional>
 #include <sstream>
 #include <memory>
@@ -18,7 +19,7 @@ namespace zxorm {
         friend class Statement<Connection, Table...>;
         using statement_t = Statement<Connection, Table...>;
     public:
-        static Maybe<Connection<Table...>> create(const char* fileName, int flags = 0, const char* zVfs = nullptr, Logger logger = nullptr) {
+        static Result<Connection<Table...>> create(const char* fileName, int flags = 0, const char* zVfs = nullptr, Logger logger = nullptr) {
             if (!flags) {
                 flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
             }
@@ -121,7 +122,7 @@ namespace zxorm {
         }
 
         template<class T, typename PrimaryKeyType>
-        Maybe<std::optional<T>> findRecord(const PrimaryKeyType& id)
+        OptionalResult<T> findRecord(const PrimaryKeyType& id)
         {
             using table_t = typename TableForClass<T>::type;
 

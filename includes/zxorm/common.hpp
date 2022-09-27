@@ -39,9 +39,6 @@ namespace zxorm {
         }
     };
 
-    template <class T>
-    using Maybe = std::variant<Error, T>;
-
     template<size_t N>
     struct FixedLengthString {
         constexpr FixedLengthString(const char (&str)[N]) {

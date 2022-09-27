@@ -28,22 +28,22 @@ using table_t = Table<"test", Object,
 using MyConnection = Connection<table_t>;
 
 class TableCreationTest : public ::testing::Test {
- protected:
-  void SetUp() override {
-    auto createdConn = MyConnection::create("test.db", 0, 0, &logger);
-    if (!std::holds_alternative<MyConnection>(createdConn)) {
-        throw "Unable to open connection";
+    protected:
+    void SetUp() override {
+        auto createdConn = MyConnection::create("test.db", 0, 0, &logger);
+        if (!createdConn) {
+            throw "Unable to open connection";
+        }
+
+        myConn = std::make_shared<MyConnection>(createdConn.value());
     }
 
-     myConn = std::make_shared<MyConnection>(std::move(std::get<MyConnection>(createdConn)));
-  }
+    std::shared_ptr<MyConnection> myConn;
 
-  std::shared_ptr<MyConnection> myConn;
-
-  void TearDown() override {
-      myConn = nullptr;
-      std::filesystem::rename("test.db", "test.db.old");
-  }
+    void TearDown() override {
+        myConn = nullptr;
+        std::filesystem::rename("test.db", "test.db.old");
+    }
 };
 
 TEST_F(TableCreationTest, CreateTables) {

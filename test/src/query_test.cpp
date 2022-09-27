@@ -28,36 +28,34 @@ using table_t = Table<"test", Object,
 using MyConnection = Connection<table_t>;
 
 class QueryTest : public ::testing::Test {
- protected:
-  void SetUp() override {
-    auto createdConn = MyConnection::create("test.db", 0, 0, &logger);
-    if (!std::holds_alternative<MyConnection>(createdConn)) {
-        throw "Unable to open connection";
+    protected:
+    void SetUp() override {
+        auto createdConn = MyConnection::create("test.db", 0, 0, &logger);
+        ASSERT_TRUE(createdConn);
+
+        myConn = std::make_shared<MyConnection>(createdConn.value());
+
+        auto createTablesErr = myConn->createTables(true);
+        ASSERT_FALSE(createTablesErr);
     }
 
-     myConn = std::make_shared<MyConnection>(std::move(std::get<MyConnection>(createdConn)));
+    std::shared_ptr<MyConnection> myConn;
 
-    auto createTablesErr = myConn->createTables(true);
-    ASSERT_FALSE(createTablesErr);
-  }
-
-  std::shared_ptr<MyConnection> myConn;
-
-  void TearDown() override {
-      myConn = nullptr;
-      std::filesystem::rename("test.db", "test.db.old");
-  }
+    void TearDown() override {
+        myConn = nullptr;
+        std::filesystem::rename("test.db", "test.db.old");
+    }
 };
 
 TEST_F(QueryTest, FindNothing)
 {
     auto result = myConn->findRecord<Object>(1);
-    if (std::holds_alternative<Error>(result)) {
-        auto err = std::get<Error>(result);
+    if (result.is_error()) {
+        auto err = result.error();
         std::cout << std::string(err) << std::endl;
         ASSERT_FALSE(true);
     } else {
-        auto record = std::get<std::optional<Object>>(result);
+        std::optional<Object> record = std::move(result);
         if (record.has_value()) {
             std::cout << record.value().id << std::endl;
             std::cout << record.value().someId << std::endl;
@@ -94,12 +92,12 @@ TEST_F(QueryTest, FindSomething)
     ASSERT_FALSE(err);
 
     auto result = myConn->findRecord<Object>(1);
-    if (std::holds_alternative<Error>(result)) {
-        auto err = std::get<Error>(result);
+    if (result.is_error()) {
+        auto err = result.error();
         std::cout << std::string(err) << std::endl;
         ASSERT_FALSE(true);
     } else {
-        auto record = std::get<std::optional<Object>>(result);
+        std::optional<Object> record = std::move(result);
         ASSERT_TRUE(record);
         ASSERT_EQ(record.value().id, 1);
         ASSERT_EQ(record.value().someText, "Some text");
@@ -124,12 +122,11 @@ TEST_F(QueryTest, FindSomethingWithOptionalsFilled)
     ASSERT_FALSE(err);
 
     auto result = myConn->findRecord<Object>(1);
-    if (std::holds_alternative<Error>(result)) {
-        auto err = std::get<Error>(result);
-        std::cout << std::string(err) << std::endl;
+    if (result.is_error()) {
+        std::cout << std::string(result.error()) << std::endl;
         ASSERT_FALSE(true);
     } else {
-        auto record = std::get<std::optional<Object>>(result);
+        auto record = result.value();
         ASSERT_TRUE(record);
         ASSERT_EQ(record.value().id, 1);
         ASSERT_EQ(record.value().someText, "Some text");
@@ -157,6 +154,6 @@ TEST_F(QueryTest, DeleteSomething)
     err = myConn->deleteRecord<Object>(1);
     ASSERT_FALSE(err);
     auto result = myConn->findRecord<Object>(1);
-    ASSERT_FALSE(std::holds_alternative<Error>(result));
-    ASSERT_FALSE(std::get<std::optional<Object>>(result));
+    ASSERT_TRUE(result);
+    ASSERT_FALSE(result.value());
 }

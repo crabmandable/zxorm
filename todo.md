@@ -12,11 +12,9 @@
 
 * Table constraints
 
-* Save<T>(T& record);
-
 * Update
 
-* Delete
+* deleteWhere
 
 * Bulk insert
 
