@@ -78,7 +78,7 @@ namespace zxorm {
         }
 
         template<class T>
-        std::optional<Error> insert(const T& record) {
+        std::optional<Error> insertRecord(const T& record) {
             using table_t = typename TableForClass<T>::type;
 
             auto query = table_t::insertQuery();
@@ -121,7 +121,7 @@ namespace zxorm {
         }
 
         template<class T, typename PrimaryKeyType>
-        Maybe<std::optional<T>> find(const PrimaryKeyType& id)
+        Maybe<std::optional<T>> findRecord(const PrimaryKeyType& id)
         {
             using table_t = typename TableForClass<T>::type;
 
@@ -175,6 +175,34 @@ namespace zxorm {
             }
 
             return record;
+        }
+
+        template<class T, typename PrimaryKeyType>
+        std::optional<Error> deleteRecord(const PrimaryKeyType& id)
+        {
+            using table_t = typename TableForClass<T>::type;
+
+            static_assert(table_t::hasPrimaryKey, "Cannot execute a delete on a table without a primary key");
+
+            static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::PrimaryKey::MemberType>,
+                    "Primary key type does not match the type specified in the definition of the table");
+
+            typename table_t::PrimaryKey::MemberType pk = id;
+            auto query = table_t::deleteQuery();
+            statement_t s = {this, query};
+            if (s.error) {
+                return s.error.value();
+            }
+            std::optional<Error> err = s.bind(1, pk);
+            if (err) {
+                return err.value();
+            }
+            err = s.step();
+            if (err) {
+                return err.value();
+            }
+
+            return std::nullopt;
         }
 
     private:

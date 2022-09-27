@@ -75,7 +75,14 @@ class Table {
             ss << "WHERE `" << PrimaryKey::name() << "` = ?;";
 
             return ss.str();
+        }
 
+        static std::string deleteQuery() {
+            std::ostringstream ss;
+            ss << "DELETE FROM `" << tableName.value << "` ";
+            ss << "WHERE `" << PrimaryKey::name() << "` = ?;";
+
+            return ss.str();
         }
 
         static std::string insertQuery() {

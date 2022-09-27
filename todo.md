@@ -7,7 +7,6 @@
     * Expression as default
 
 * Selects:
-    * T Find<T>(int id);
     * Handle finding by multi-column primary key
     * Where
 
@@ -28,5 +27,8 @@
 * Tests:
     * Constraints
 
+* Statement caching
+
 FIX:
     duplicate column class
+    the `Maybe` bullshit thing
