@@ -29,4 +29,3 @@
 
 FIX:
     duplicate column class
-    the `Maybe` bullshit thing

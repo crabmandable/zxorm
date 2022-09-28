@@ -19,7 +19,7 @@ namespace zxorm {
             conn->_logger(LogLevel::Debug, "Prepared statement");
             conn->_logger(LogLevel::Debug, query.c_str());
 
-            int result = sqlite3_prepare_v2(conn->_db_handle, query.c_str(), query.size() + 1, &stmt, nullptr);
+            int result = sqlite3_prepare_v2(conn->_db_handle.get(), query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK) {
                 const char* str = sqlite3_errstr(result);
                 conn->_logger(LogLevel::Error, "Unable to initialize statment");
