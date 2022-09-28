@@ -10,7 +10,7 @@ namespace zxorm {
         REAL = SQLITE_FLOAT,
     };
 
-    static constexpr const char* sqlTypeStr(sqlite_column_type t) {
+    static constexpr const char* sql_type_str(sqlite_column_type t) {
         switch(t) {
             case sqlite_column_type::INTEGER: {
                 return "INTEGER";
@@ -35,7 +35,7 @@ namespace zxorm {
         DESC,
     };
 
-    static constexpr const char* orderStr(order_t t) {
+    static constexpr const char* order_str(order_t t) {
         switch(t) {
             case order_t::NONE: {
                 return "";
@@ -52,19 +52,18 @@ namespace zxorm {
     }
 
     template<typename T>
-    struct MemberTypeToSQLType {
+    struct member_to_sql_type {
         private:
-        static constexpr sqlite_column_type findType() {
-            using type = typename remove_optional<T>::type;
-            if constexpr (IsArithmetic<type>()) {
-                if (std::is_floating_point_v<type>) {
+        static constexpr sqlite_column_type _impl() {
+            if constexpr (ignore_qualifiers::is_arithmetic<T>()) {
+                if (ignore_qualifiers::is_floating_point<T>()) {
                     return sqlite_column_type::REAL;
                 } else {
                     return sqlite_column_type::INTEGER;
                 }
-            } else if constexpr (IsString<type>()) {
+            } else if constexpr (ignore_qualifiers::is_string<T>()) {
                 return sqlite_column_type::TEXT;
-            } else if constexpr (IsContinuousContainer<type>()) {
+            } else if constexpr (ignore_qualifiers::is_continuous_container<T>()) {
                 return sqlite_column_type::BLOB;
             } else {
                 static_assert(std::is_same_v<T, std::false_type>,
@@ -74,7 +73,7 @@ namespace zxorm {
             }
         }
         public:
-        static constexpr sqlite_column_type value = findType();
+        static constexpr sqlite_column_type value = _impl();
     };
 
 };

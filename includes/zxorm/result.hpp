@@ -5,18 +5,18 @@ namespace zxorm {
     template <class T>
     struct Result {
         protected:
-        std::variant<Error, T> result;
+        std::variant<Error, T> _result;
 
         public:
         Result(const Result& r) = delete;
         Result& operator = (const Result&) = delete;
         Result(Result&& r) = default;
         Result& operator = (Result&&) = default;
-        Result(T r) : result{std::move(r)} {}
-        Result(Error r) : result{std::move(r)} {}
+        Result(T r) : _result{std::move(r)} {}
+        Result(Error r) : _result{std::move(r)} {}
 
         bool is_error() const {
-            return std::holds_alternative<Error>(result);
+            return std::holds_alternative<Error>(_result);
         }
 
         operator bool () const {
@@ -24,7 +24,7 @@ namespace zxorm {
         }
 
         operator const Error& () const {
-            return std::get<Error>(result);
+            return std::get<Error>(_result);
         }
 
         const Error& error () const {
@@ -32,11 +32,11 @@ namespace zxorm {
         }
 
         operator const T& () const {
-            return std::get<T>(result);
+            return std::get<T>(_result);
         }
 
         operator T&& () {
-            return std::move(std::get<T>(result));
+            return std::move(std::get<T>(_result));
         }
 
         const T& value() const {

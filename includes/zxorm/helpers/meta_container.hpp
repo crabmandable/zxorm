@@ -6,7 +6,7 @@
 namespace zxorm {
     template<ContinuousContainer C>
     requires(not OptionalT<C>)
-    [[nodiscard]] bool safeResize(C& container, auto size) {
+    [[nodiscard]] bool safe_resize(C& container, auto size) {
         if constexpr (requires { container.resize(size); }) {
             container.resize(size);
         } else {
@@ -21,14 +21,14 @@ namespace zxorm {
     template<ContinuousContainer C>
     class MetaContainer {
         private:
-        C& container;
+        C& _container;
         using PlainC = typename remove_optional<C>::type;
 
         public:
-        MetaContainer(C& c) : container{c} {}
+        MetaContainer(C& c) : _container{c} {}
 
         PlainC& value() {
-            return container;
+            return _container;
         }
 
         bool has_value() {
@@ -37,27 +37,27 @@ namespace zxorm {
 
         template<typename SizeT>
         [[nodiscard]] bool resize(SizeT len) {
-            return safeResize(container, len);
+            return safe_resize(_container, len);
         }
 
         void clear() {
-            if constexpr (requires { container.clear(); }) {
-                container.clear();
+            if constexpr (requires { _container.clear(); }) {
+                _container.clear();
             } else {
-                std::fill_n(container.begin(), container.size(), 0);
+                std::fill_n(_container.begin(), _container.size(), 0);
             }
         }
 
         auto size () const -> decltype(std::declval<PlainC>().size()) {
-            return container.size();
+            return _container.size();
         }
 
         auto data () const -> decltype(std::declval<PlainC>().data()) {
-            return container.data();
+            return _container.data();
         }
 
         auto data () -> decltype(std::declval<PlainC>().data()) {
-            return container.data();
+            return _container.data();
         }
     };
 
@@ -65,45 +65,45 @@ namespace zxorm {
     requires(OptionalT<C>)
     class MetaContainer<C> {
         private:
-        C& container;
+        C& _container;
         using PlainC = remove_optional<std::remove_cvref_t<C>>::type;
 
         public:
-        MetaContainer(C& c) : container{c} {}
+        MetaContainer(C& c) : _container{c} {}
 
         PlainC& value() {
-            return container.value();
+            return _container.value();
         }
 
         bool has_value() {
-            return container.has_value();
+            return _container.has_value();
         }
 
         template<typename SizeT>
         [[nodiscard]] bool resize(SizeT len) {
-            if (!container.has_value()) container = PlainC{};
-            auto& value = container.value();
-            return safeResize(value, len);
+            if (!_container.has_value()) _container = PlainC{};
+            auto& value = _container.value();
+            return safe_resize(value, len);
         }
 
         void clear() {
-            container = std::nullopt;
+            _container = std::nullopt;
         }
 
         auto size () const -> decltype(std::declval<PlainC>().size()) {
-            if (!container.has_value()) return 0;
-            return container.value().size();
+            if (!_container.has_value()) return 0;
+            return _container.value().size();
         }
 
         auto data () const -> decltype(std::declval<const PlainC>().data()) {
-            if (!container.has_value()) {
+            if (!_container.has_value()) {
                 return nullptr;
             }
-            return container.value().data();
+            return _container.value().data();
         }
 
         auto data () -> decltype(std::declval<PlainC>().data()) {
-            return container.value().data();
+            return _container.value().data();
         }
     };
 };

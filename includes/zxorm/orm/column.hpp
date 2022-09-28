@@ -14,12 +14,12 @@ namespace zxorm {
         };
 
         template <typename MemberT, typename... C>
-        requires (not IsOptional<MemberT>())
+        requires (not ignore_qualifiers::is_optional<MemberT>())
         struct constraints_t<MemberT, C...> {
             using type = unique_tuple<NotNull<>, C...>;
         };
 
-        static inline std::string constraintCreationQuery(auto constraints) {
+        static inline std::string constraint_creation_query(auto constraints) {
             std::stringstream ss;
             std::apply([&] (const auto&... c) {
                 ([&](){
@@ -37,118 +37,118 @@ namespace zxorm {
         }
     };
 
-    template <FixedLengthString columnName, auto M, class... Constraint>
+    template <FixedLengthString column_name, auto M, class... Constraint>
     class Column {
         template< typename T >
-        struct FindColumnType : std::false_type
+        struct find_column_traits : std::false_type
         {
             using type = std::false_type;
         };
 
         template< typename R, typename C, class A>
-        struct FindColumnType< R (C::*)(A) >
+        struct find_column_traits< R (C::*)(A) >
         {
             using type = std::false_type;
         };
 
         template< typename R, typename C>
-        struct FindColumnType< R C::* >
+        struct find_column_traits< R C::* >
         {
             using type = R;
             using klass = C;
         };
 
         public:
-        static constexpr bool publicColumn = true;
-        using MemberType = typename FindColumnType<decltype(M)>::type;
-        static_assert(!std::is_same<MemberType, std::false_type>::value, "Column template argument should be a pointer to a class member");
-        using ObjectClass = typename FindColumnType<decltype(M)>::klass;
-        using constraints_t = typename __constraint_t_detail::constraints_t<MemberType, Constraint...>::type;
+        static constexpr bool public_column = true;
+        using member_t = typename find_column_traits<decltype(M)>::type;
+        static_assert(!std::is_same<member_t, std::false_type>::value, "Column template argument should be a pointer to a class member");
+        using object_class = typename find_column_traits<decltype(M)>::klass;
+        using constraints_t = typename __constraint_t_detail::constraints_t<member_t, Constraint...>::type;
 
-        static constexpr sqlite_column_type sqlColumnType = MemberTypeToSQLType<MemberType>::value;
+        static constexpr sqlite_column_type sql_column_type = member_to_sql_type<member_t>::value;
 
-        static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
-        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && sqlColumnType == sqlite_column_type::INTEGER;
+        static constexpr bool is_primary_key = any_of<constraint_is_primary_key<Constraint>::value...>;
+        static constexpr bool is_auto_inc_column = any_of<constraint_is_primary_key<Constraint>::value...> && sql_column_type == sqlite_column_type::INTEGER;
 
-        static constexpr const char* name() { return columnName.value; }
+        static constexpr const char* name() { return column_name.value; }
         static auto& getter(auto& obj) { return obj.*M; };
         static void setter(auto& obj, auto arg) { obj.*M = arg; };
 
-        static std::string constraintCreationQuery() {
-            return __constraint_t_detail::constraintCreationQuery(constraints_t{});
+        static std::string constraint_creation_query() {
+            return __constraint_t_detail::constraint_creation_query(constraints_t{});
         }
     };
 
-    template <FixedLengthString columnName, auto Getter, auto Setter, class... Constraint>
+    template <FixedLengthString column_name, auto Getter, auto Setter, class... Constraint>
     class ColumnPrivate {
         private:
         template< typename T >
-        struct ResolveFnPtrTypes : std::false_type
+        struct fn_ptr_traits : std::false_type
         {
-            using argType = std::false_type;
-            using returnType = void;
+            using arg_type = std::false_type;
+            using return_type = void;
             using klass = std::false_type;
         };
 
         // pointer to setter
         template<typename C, class A >
-        struct ResolveFnPtrTypes< void (C::*)(A) >
+        struct fn_ptr_traits< void (C::*)(A) >
         {
-            using argType = A;
+            using arg_type = A;
             using klass = C;
-            using returnType = void;
+            using return_type = void;
         };
 
         // pointer to getter
         template< typename R, typename C  >
-        struct ResolveFnPtrTypes< R (C::*)() >
+        struct fn_ptr_traits< R (C::*)() >
         {
-            using argType = std::false_type;
+            using arg_type = std::false_type;
             using klass = C;
-            using returnType = R;
+            using return_type = R;
         };
 
         // pointer to member
         template< typename R, typename C>
-        struct ResolveFnPtrTypes< R C::* >
+        struct fn_ptr_traits< R C::* >
         {
-            using argType = std::false_type;
-            using returnType = void;
+            using arg_type = std::false_type;
+            using return_type = void;
             using klass = std::false_type;
         };
 
-        using SetterResolved = ResolveFnPtrTypes<decltype(Setter)>;
-        using GetterResolved = ResolveFnPtrTypes<decltype(Getter)>;
+        using setter_traits = fn_ptr_traits<decltype(Setter)>;
+        using getter_traits = fn_ptr_traits<decltype(Getter)>;
 
-        static_assert(not std::is_same<typename SetterResolved::argType, std::false_type>::value,
+        static_assert(not std::is_same<typename setter_traits::arg_type, std::false_type>::value,
             "Column template argument should be a pointer to a class method that sets the column data");
-        static_assert(std::is_void<typename SetterResolved::returnType>::value,
+        static_assert(std::is_void<typename setter_traits::return_type>::value,
             "Column template argument should be a pointer to a class method that sets the column data. The return type should be `void`");
 
-        static_assert(std::is_same<typename GetterResolved::argType, std::false_type>::value,
+        static_assert(std::is_same<typename getter_traits::arg_type, std::false_type>::value,
             "Column template argument should be a pointer to a class method that gets the column data");
-        static_assert(not std::is_void<typename GetterResolved::returnType>::value,
+        static_assert(not std::is_void<typename getter_traits::return_type>::value,
             "Column template argument should be a pointer to a class method that gets the column data. The return type should not be `void`");
 
-        static_assert(std::is_same<typename GetterResolved::returnType, typename SetterResolved::argType>::value,
+        static_assert(std::is_same<typename getter_traits::return_type, typename setter_traits::arg_type>::value,
                 "Column template arguments should be a pointers to class methods that get and set the column data");
 
         public:
-        static constexpr bool publicColumn = false;
-        using MemberType = typename SetterResolved::argType;
-        static constexpr sqlite_column_type sqlColumnType = MemberTypeToSQLType<MemberType>::value;
-        using ObjectClass = typename SetterResolved::klass;
+        static constexpr bool public_column = false;
+        using member_t = typename setter_traits::arg_type;
+        static constexpr sqlite_column_type sql_column_type = member_to_sql_type<member_t>::value;
+        using object_class = typename setter_traits::klass;
 
-        using constraints_t = typename __constraint_t_detail::constraints_t<MemberType, Constraint...>::type;
-        static constexpr bool isPrimaryKey = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...>;
-        static constexpr bool isAutoIncColumn = AnyOf<ConstraintIsPrimaryKey<Constraint>::value...> && sqlColumnType == sqlite_column_type::INTEGER;
+        using constraints_t = typename __constraint_t_detail::constraints_t<member_t, Constraint...>::type;
+        static constexpr bool is_primary_key = any_of<constraint_is_primary_key<Constraint>::value...>;
+        static constexpr bool is_auto_inc_column = any_of<constraint_is_primary_key<Constraint>::value...> && sql_column_type == sqlite_column_type::INTEGER;
 
-        static constexpr const char* name() { return columnName.value; }
+        static constexpr const char* name() { return column_name.value; }
         static auto& getter(auto& obj) { return (obj.*Getter)(); };
         static void setter(auto& obj, auto arg) { (obj.*Setter)(arg); };
 
-        static std::string constraintCreationQuery() {
-            return __constraint_t_detail::constraintCreationQuery(constraints_t{});
+        static std::string constraint_creation_query() {
+            return __constraint_t_detail::constraint_creation_query(constraints_t{});
         }
     };
 

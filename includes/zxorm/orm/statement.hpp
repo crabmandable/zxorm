@@ -12,47 +12,49 @@
 namespace zxorm {
     template <class Connection, class... Table>
     class Statement {
+        private:
+        Logger _logger;
+        std::unique_ptr<sqlite3_stmt, std::function<void(sqlite3_stmt*)>> _stmt;
+        size_t _parameter_count;
+        std::map<size_t, bool> _is_bound;
+        int _column_count = 0;
+        bool _done = false;
+
+        Statement(Logger logger, sqlite3_stmt* stmt) : _logger{logger} {
+            _stmt = {stmt, [logger](sqlite3_stmt* s) {
+                int result = sqlite3_finalize(s);
+                if (result != SQLITE_OK) {
+                    const char* str = sqlite3_errstr(result);
+                    logger(log_level::Error, "Unable to finalize statment");
+                    logger(log_level::Error, str);
+                }
+            }};
+
+            _parameter_count = sqlite3_bind_parameter_count(_stmt.get());
+            for (size_t i = 1; i == _parameter_count; i++) {
+                _is_bound[i] = false;
+            }
+        }
+
         public:
         std::optional<Error> error = std::nullopt;
 
-        Statement(Connection* conn, const std::string& query) : conn{conn} {
-            conn->_logger(LogLevel::Debug, "Prepared statement");
-            conn->_logger(LogLevel::Debug, query.c_str());
-
+        [[nodiscard]] static Result<Statement> create(Connection* conn, const std::string& query)
+        {
+            sqlite3_stmt* stmt = nullptr;
             int result = sqlite3_prepare_v2(conn->_db_handle.get(), query.c_str(), query.size() + 1, &stmt, nullptr);
-            if (result != SQLITE_OK) {
+            if (result != SQLITE_OK || !stmt) {
                 const char* str = sqlite3_errstr(result);
-                conn->_logger(LogLevel::Error, "Unable to initialize statment");
-                conn->_logger(LogLevel::Error, str);
-                error = Error("Unable to initialize statement", result);
-                return;
+                conn->_logger(log_level::Error, "Unable to initialize statement");
+                conn->_logger(log_level::Error, str);
+                return Error("Unable to initialize statement", result);
             }
 
-            parameterCount = sqlite3_bind_parameter_count(stmt);
-            for (size_t i = 1; i == parameterCount; i++) {
-                isBound[i] = false;
-            }
+            conn->_logger(log_level::Debug, "Initialized statement");
+            conn->_logger(log_level::Debug, query.c_str());
+
+            return Statement(conn->_logger, stmt);
         }
-
-        ~Statement() {
-            int result = sqlite3_finalize(stmt);
-            if (result != SQLITE_OK) {
-                const char* str = sqlite3_errstr(result);
-                conn->_logger(LogLevel::Error, "Unable to finalize statment");
-                conn->_logger(LogLevel::Error, str);
-            }
-        }
-
-        private:
-        friend Connection;
-        Connection* conn;
-        sqlite3_stmt* stmt;
-
-        size_t parameterCount;
-        std::map<size_t, bool> isBound;
-        int columnCount = 0;
-        bool done = false;
-
 
         template <ArithmeticT T>
         [[nodiscard]] std::optional<Error> bind(size_t idx, const T& param)
@@ -60,11 +62,11 @@ namespace zxorm {
             using unwrapped_t = typename remove_optional<T>::type;
             const unwrapped_t* unwrapped;
             int result;
-            bool boundNull = false;
-            if constexpr (IsOptional<T>()) {
+            bool bound_null = false;
+            if constexpr (ignore_qualifiers::is_optional<T>()) {
                 if (!param.has_value()) {
-                    result = sqlite3_bind_null(stmt, idx);
-                    boundNull = true;
+                    result = sqlite3_bind_null(_stmt.get(), idx);
+                    bound_null = true;
                 } else {
                     unwrapped = &param.value();
                 }
@@ -72,113 +74,108 @@ namespace zxorm {
                 unwrapped = &param;
             }
 
-            if (!boundNull) {
+            if (!bound_null) {
                 if constexpr (std::is_floating_point_v<unwrapped_t>) {
-                    result = sqlite3_bind_double(stmt, idx, *unwrapped);
+                    result = sqlite3_bind_double(_stmt.get(), idx, *unwrapped);
                 } else {
                     if (sizeof(T) <= 4) {
-                        result = sqlite3_bind_int(stmt, idx, *unwrapped);
+                        result = sqlite3_bind_int(_stmt.get(), idx, *unwrapped);
                     } else {
-                        result = sqlite3_bind_int64(stmt, idx, *unwrapped);
+                        result = sqlite3_bind_int64(_stmt.get(), idx, *unwrapped);
                     }
                 }
             }
 
             if (result != SQLITE_OK) {
-                conn->_logger(LogLevel::Error, "Unable to bind parameter to statement");
                 return Error("Unable to bind parameter to statment", result);
             }
-            isBound[idx] = true;
+            _is_bound[idx] = true;
             return std::nullopt;
         }
 
         template <ContinuousContainer T>
         [[nodiscard]] std::optional<Error> bind(size_t idx, const T& param)
         {
-            bool boundNull = false;
+            bool bound_null = false;
             int result;
 
-            if constexpr (IsOptional<T>()) {
+            if constexpr (ignore_qualifiers::is_optional<T>()) {
                 if (!param.has_value()) {
-                    result = sqlite3_bind_null(stmt, idx);
-                    boundNull = true;
+                    result = sqlite3_bind_null(_stmt.get(), idx);
+                    bound_null = true;
                 }
             }
 
-            if (!boundNull) {
-                const auto paramToBind = MetaContainer<const T>(param);
-                constexpr size_t elSize = sizeof(typename remove_optional<T>::type::value_type);
-                result = sqlite3_bind_blob(stmt, idx, paramToBind.data(), paramToBind.size() * elSize, nullptr);
+            if (!bound_null) {
+                const auto param_to_bind = MetaContainer<const T>(param);
+                constexpr size_t el_size = sizeof(typename remove_optional<T>::type::value_type);
+                result = sqlite3_bind_blob(_stmt.get(), idx, param_to_bind.data(), param_to_bind.size() * el_size, nullptr);
             }
 
             if (result != SQLITE_OK) {
-                conn->_logger(LogLevel::Error, "Unable to bind parameter to statement");
                 return Error("Unable to bind parameter to statment", result);
             }
 
-            isBound[idx] = true;
+            _is_bound[idx] = true;
 
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<Error> rewind() {
-            int result = sqlite3_reset(stmt);
+            int result = sqlite3_reset(_stmt.get());
             if (result != SQLITE_OK) {
-                conn->_logger(LogLevel::Error, "Unable to reset statment");
                 return Error( "Unable to reset statment", result);
             }
-            done = false;
+            _done = false;
         }
 
         [[nodiscard]] std::optional<Error> reset() {
             auto err = rewind();
             if (err) return err;
 
-            int result = sqlite3_clear_bindings(stmt);
+            int result = sqlite3_clear_bindings(_stmt.get());
             if (result != SQLITE_OK) {
-                conn->_logger(LogLevel::Error, "Unable to clear bindings");
                 return Error( "Unable to clear bindings", result);
             }
-            for (auto& [_, v] : isBound) v = false;
+            for (auto& [_, v] : _is_bound) v = false;
 
             return std::nullopt;
         }
 
         [[nodiscard]] std::optional<Error> step() {
-            if (done) {
+            if (_done) {
                 return Error("Query has run to completion");
             }
-            if (std::any_of(isBound.cbegin(), isBound.cend(),
+            if (std::any_of(_is_bound.cbegin(), _is_bound.cend(),
                         [](const auto& bound) { return !bound.second; } )) {
                 return Error("Some parameters have not been bound");
             }
 
-            int result = sqlite3_step(stmt);
+            int result = sqlite3_step(_stmt.get());
             if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
-                conn->_logger(LogLevel::Error, "Unable to execute statment");
                 return Error("Unable to execute statment", result);
             }
 
-            done = result == SQLITE_DONE;
+            _done = result == SQLITE_DONE;
 
-            columnCount = sqlite3_column_count(stmt);
+            _column_count = sqlite3_column_count(_stmt.get());
 
             return std::nullopt;
         }
 
         template<ContinuousContainer T>
-        [[nodiscard]] std::optional<Error> readColumn(size_t idx, T& outParam) {
-            auto out = MetaContainer<T>(outParam);
-            int dataType = sqlite3_column_type(stmt, idx);
-            switch(dataType) {
+        [[nodiscard]] std::optional<Error> read_column(size_t idx, T& out_param) {
+            auto out = MetaContainer<T>(out_param);
+            int data_type = sqlite3_column_type(_stmt.get(), idx);
+            switch(data_type) {
                 case SQLITE_INTEGER:
                 case SQLITE_FLOAT: {
                     return Error("Tried to read an arithmetic column into a container");
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
-                    const void* data = sqlite3_column_blob(stmt, idx);
-                    size_t len = sqlite3_column_bytes(stmt, idx);
+                    const void* data = sqlite3_column_blob(_stmt.get(), idx);
+                    size_t len = sqlite3_column_bytes(_stmt.get(), idx);
                     if (!out.resize(len)) {
                         return Error("Container does not have enough space to read column data");
                     }
@@ -199,37 +196,37 @@ namespace zxorm {
         }
 
         template<ArithmeticT T>
-        [[nodiscard]] std::optional<Error> readColumn(size_t idx, T& outParam) {
-            int dataType = sqlite3_column_type(stmt, idx);
-            switch(dataType) {
+        [[nodiscard]] std::optional<Error> read_column(size_t idx, T& out_param) {
+            int data_type = sqlite3_column_type(_stmt.get(), idx);
+            switch(data_type) {
                 case SQLITE_INTEGER: {
-                    if (sizeof(outParam) <= 4) {
-                        outParam = sqlite3_column_int(stmt, idx);
+                    if (sizeof(out_param) <= 4) {
+                        out_param = sqlite3_column_int(_stmt.get(), idx);
                     } else {
-                        outParam = sqlite3_column_int64(stmt, idx);
+                        out_param = sqlite3_column_int64(_stmt.get(), idx);
                     }
                     break;
                 }
                 case SQLITE_FLOAT: {
-                    outParam = sqlite3_column_double(stmt, idx);
+                    out_param = sqlite3_column_double(_stmt.get(), idx);
                     break;
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
                     return Error("Tried to read an arithmetic column into a container");
-                    size_t len = sqlite3_column_bytes(stmt, idx);
+                    size_t len = sqlite3_column_bytes(_stmt.get(), idx);
                     if (len > sizeof(T)) {
                         return Error("Param does not have enough space to fit column contents");
                     }
-                    const void* data = sqlite3_column_blob(stmt, idx);
-                    std::memcpy(&outParam, data, len);
+                    const void* data = sqlite3_column_blob(_stmt.get(), idx);
+                    std::memcpy(&out_param, data, len);
                     break;
                 }
                 case SQLITE_NULL: {
-                    if constexpr (IsOptional<T>()) {
-                        outParam = std::nullopt;
+                    if constexpr (ignore_qualifiers::is_optional<T>()) {
+                        out_param = std::nullopt;
                     } else {
-                        outParam = 0;
+                        out_param = 0;
                     }
                     break;
                 }
@@ -242,5 +239,8 @@ namespace zxorm {
 
             return std::nullopt;
         }
+
+        int column_count() { return _column_count; }
+        bool done() { return _done; }
     };
 };

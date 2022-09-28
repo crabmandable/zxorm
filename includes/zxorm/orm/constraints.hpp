@@ -23,7 +23,7 @@ namespace zxorm {
     };
 
     namespace __constraint_enum_to_str {
-        constexpr const char* actionStr(action_t c) {
+        constexpr const char* action_str(action_t c) {
             switch(c) {
                 case action_t::no_action:
                     return "NO_ACTION";
@@ -40,7 +40,7 @@ namespace zxorm {
             return "OOPS";
         }
 
-        constexpr const char* conflictStr(conflict_t c) {
+        constexpr const char* conflict_str(conflict_t c) {
             switch(c) {
                 case conflict_t::rollback:
                     return "ROLLBACK";
@@ -58,13 +58,13 @@ namespace zxorm {
         }
     }
 
-    template<FixedLengthString tableName, FixedLengthString... column>
+    template<FixedLengthString table_name, FixedLengthString... column>
         struct Reference {
             static std::string to_string() {
                 std::ostringstream ss;
-                ss << "REFERENCES `" << tableName.value << "` (`";
+                ss << "REFERENCES `" << table_name.value << "` (`";
 
-                ss << AppendToStream<"`, `", column...>();
+                ss << append_to_stream<"`, `", column...>();
 
                 std::string str = ss.str();
                 str.erase(str.end() - 3, str.end());
@@ -73,13 +73,13 @@ namespace zxorm {
         };
 
     // TODO support defferrable
-    template<typename Reference, action_t onUpdate=action_t::no_action, action_t onDelete=action_t::no_action>
+    template<typename Reference, action_t on_update=action_t::no_action, action_t on_delete=action_t::no_action>
     struct ForeignKey {
         static std::string to_string() {
             std::ostringstream ss;
             ss << Reference::to_string()
-                << " ON UPDATE " << __constraint_enum_to_str::actionStr(onUpdate)
-                << " ON DELETE " << __constraint_enum_to_str::actionStr(onDelete);
+                << " ON UPDATE " << __constraint_enum_to_str::action_str(on_update)
+                << " ON DELETE " << __constraint_enum_to_str::action_str(on_delete);
             return ss.str();
         }
 
@@ -121,11 +121,11 @@ namespace zxorm {
         }
     };
 
-    template<FixedLengthString constraint, conflict_t onConflict>
+    template<FixedLengthString constraint, conflict_t on_conflict>
     struct ConstraintWithConflictClause {
         static std::string to_string() {
             std::stringstream ss;
-            ss << constraint.value << " ON CONFLICT " << __constraint_enum_to_str::conflictStr(onConflict);
+            ss << constraint.value << " ON CONFLICT " << __constraint_enum_to_str::conflict_str(on_conflict);
             return ss.str();
         }
 
@@ -137,32 +137,32 @@ namespace zxorm {
         }
     };
 
-    template<conflict_t onConflict=conflict_t::abort>
-    using Unique = ConstraintWithConflictClause<"UNIQUE", onConflict>;
+    template<conflict_t on_conflict=conflict_t::abort>
+    using Unique = ConstraintWithConflictClause<"UNIQUE", on_conflict>;
 
-    template<conflict_t onConflict=conflict_t::abort>
-    using NotNull = ConstraintWithConflictClause<"NOT NULL", onConflict>;
+    template<conflict_t on_conflict=conflict_t::abort>
+    using NotNull = ConstraintWithConflictClause<"NOT NULL", on_conflict>;
 
-    template<conflict_t onConflict=conflict_t::abort>
-    using PrimaryKey = ConstraintWithConflictClause<"PRIMARY KEY", onConflict>;
+    template<conflict_t on_conflict=conflict_t::abort>
+    using PrimaryKey = ConstraintWithConflictClause<"PRIMARY KEY", on_conflict>;
 
-    template<conflict_t onConflict=conflict_t::abort>
-    using PrimaryKeyAsc = ConstraintWithConflictClause<"PRIMARY KEY ASC", onConflict>;
+    template<conflict_t on_conflict=conflict_t::abort>
+    using PrimaryKeyAsc = ConstraintWithConflictClause<"PRIMARY KEY ASC", on_conflict>;
 
-    template<conflict_t onConflict=conflict_t::abort>
-    using PrimaryKeyDesc = ConstraintWithConflictClause<"PRIMARY KEY DESC", onConflict>;
+    template<conflict_t on_conflict=conflict_t::abort>
+    using PrimaryKeyDesc = ConstraintWithConflictClause<"PRIMARY KEY DESC", on_conflict>;
 
     template <typename T>
-    struct ConstraintIsPrimaryKey : std::false_type { };
+    struct constraint_is_primary_key : std::false_type { };
 
     template<auto T>
-    struct ConstraintIsPrimaryKey<PrimaryKey<T>> : std::true_type {};
+    struct constraint_is_primary_key<PrimaryKey<T>> : std::true_type {};
 
     template<auto T>
-    struct ConstraintIsPrimaryKey<PrimaryKeyAsc<T>> : std::true_type {};
+    struct constraint_is_primary_key<PrimaryKeyAsc<T>> : std::true_type {};
 
     template<auto T>
-    struct ConstraintIsPrimaryKey<PrimaryKeyDesc<T>> : std::true_type {};
+    struct constraint_is_primary_key<PrimaryKeyDesc<T>> : std::true_type {};
 
     //TODO add `CHECK` constraint
 };

@@ -29,8 +29,8 @@ namespace zxorm {
                 if (result != SQLITE_OK) {
                     const char* str = sqlite3_errstr(result);
                     if (logger) {
-                        logger(LogLevel::Error, "Unable to destruct connection");
-                        logger(LogLevel::Error, str);
+                        logger(log_level::Error, "Unable to destruct connection");
+                        logger(log_level::Error, str);
                     }
                 }
             }};
@@ -40,13 +40,13 @@ namespace zxorm {
         Logger _logger = nullptr;
 
         template<class C>
-        struct TableForClass {
-            static constexpr int idx = IndexOfFirst<std::is_same<C, typename Table::ObjectClass>::value...>::value;
+        struct table_for_class {
+            static constexpr int idx = index_of_first<std::is_same<C, typename Table::object_class>::value...>::value;
             static_assert(idx >= 0, "Connection does not contain any table matching the type T");
             using type = typename std::tuple_element<idx, std::tuple<Table...>>::type;
         };
     public:
-        static Result<Connection<Table...>> create(const char* fileName, int flags = 0, const char* zVfs = nullptr, Logger logger = nullptr) {
+        static Result<Connection<Table...>> create(const char* file_name, int flags = 0, const char* z_vfs = nullptr, Logger logger = nullptr) {
             if (!flags) {
                 flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
             }
@@ -54,16 +54,16 @@ namespace zxorm {
             if (logger) {
                 std::ostringstream oss;
                 oss << "Opening sqlite connection with flags: " << flags;
-                logger(LogLevel::Debug, oss.str().c_str());
+                logger(log_level::Debug, oss.str().c_str());
             }
 
             sqlite3* db_handle = nullptr;
-            int result = sqlite3_open_v2(fileName, &db_handle, flags, zVfs);
+            int result = sqlite3_open_v2(file_name, &db_handle, flags, z_vfs);
             if (result != SQLITE_OK || !db_handle) {
                 const char* str = sqlite3_errstr(result);
                 if (logger) {
-                    logger(LogLevel::Error, "Unable to open sqlite connection");
-                    logger(LogLevel::Error, str);
+                    logger(log_level::Error, "Unable to open sqlite connection");
+                    logger(log_level::Error, str);
                 }
                 return Error("Unable to open sqlite connection", result);
             }
@@ -76,31 +76,33 @@ namespace zxorm {
         Connection(const Connection&) = delete;
         Connection operator =(const Connection&) = delete;
 
-        std::optional<Error> createTables(bool ifNotExist = true) {
-            std::optional<Error> error = std::nullopt;
+        std::optional<Error> create_tables(bool if_not_exist = true) {
             // TODO make this a transaction
 
-            std::array<statement_t,  sizeof...(Table)> statements = {statement_t(this, Table::createTableQuery(ifNotExist))...};
+            std::array<Result<statement_t>,  sizeof...(Table)> statements = {statement_t::create(this, Table::create_table_query(if_not_exist))...};
 
             for (auto& s : statements) {
-                error = s.error;
-                if (error) break;
-                error = s.step();
-                if (error) break;
+                if (!s) {
+                    return s.error();
+                }
+                auto error = s.value().step();
+                if (error) return error;
             }
 
-            return error;
+            return std::nullopt;
         }
 
         template<class T>
-        std::optional<Error> insertRecord(const T& record) {
-            using table_t = typename TableForClass<T>::type;
+        std::optional<Error> insert_record(const T& record) {
+            using table_t = typename table_for_class<T>::type;
 
-            auto query = table_t::insertQuery();
-            statement_t s = {this, query};
-            if (s.error) {
-                return s.error.value();
+            auto query = table_t::insert_query();
+            auto s = statement_t::create(this, query);
+            if (!s) {
+                return s.error();
             }
+
+            statement_t stmt = s.value();
 
             int i = 1;
             std::optional<Error> err;
@@ -109,9 +111,9 @@ namespace zxorm {
                     if (err) return;
                     using column_t = std::remove_reference_t<decltype(a)>;
 
-                    if constexpr (!column_t::isAutoIncColumn) {
+                    if constexpr (!column_t::is_auto_inc_column) {
                         auto& val = column_t::getter(record);
-                        err = s.bind(i++, val);
+                        err = stmt.bind(i++, val);
                     }
 
                 }(), ...);
@@ -121,12 +123,12 @@ namespace zxorm {
                 return err;
             }
 
-            err = s.step();
+            err = stmt.step();
             if (err) {
                 return err;
             }
 
-            if (!s.done) {
+            if (!stmt.done()) {
                 return Error("Insert query didn't run to completion");
             }
 
@@ -136,50 +138,52 @@ namespace zxorm {
         }
 
         template<class T, typename PrimaryKeyType>
-        OptionalResult<T> findRecord(const PrimaryKeyType& id)
+        OptionalResult<T> find_record(const PrimaryKeyType& id)
         {
-            using table_t = typename TableForClass<T>::type;
+            using table_t = typename table_for_class<T>::type;
 
-            static_assert(table_t::hasPrimaryKey, "Cannot execute a find on a table without a primary key");
+            static_assert(table_t::has_primary_key, "Cannot execute a find on a table without a primary key");
 
-            static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::PrimaryKey::MemberType>,
+            static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::primary_key_t::member_t>,
                     "Primary key type does not match the type specified in the definition of the table");
 
-            typename table_t::PrimaryKey::MemberType pk = id;
-            auto query = table_t::findQuery();
-            statement_t s = {this, query};
-            if (s.error) {
-                return s.error.value();
+            typename table_t::primary_key_t::member_t pk = id;
+            auto query = table_t::find_query();
+            auto s = statement_t::create(this, query);
+            if (s.is_error()) {
+                return s.error();
             }
-            std::optional<Error> err = s.bind(1, pk);
+            statement_t stmt = s;
+
+            std::optional<Error> err = stmt.bind(1, pk);
             if (err) {
                 return err.value();
             }
-            err = s.step();
+            err = stmt.step();
             if (err) {
                 return err.value();
             }
 
-            if (s.done) {
+            if (stmt.done()) {
                 return std::nullopt;
             }
 
-            if (s.columnCount != table_t::nColumns) {
+            if (stmt.column_count() != table_t::n_columns) {
                 return Error("Unexpected number of columns returned by find query");
             }
 
             T record;
-            size_t columnIdx = 0;
+            size_t column_idx = 0;
             std::apply([&](const auto&... a) {
                 ([&]() {
                     if (err) return;
                     using column_t = std::remove_reference_t<decltype(a)>;
-                    if constexpr (column_t::publicColumn) {
-                        err = s.readColumn(columnIdx++, column_t::getter(record));
+                    if constexpr (column_t::public_column) {
+                        err = stmt.read_column(column_idx++, column_t::getter(record));
                     } else {
-                        using value_t = typename column_t::MemberType;
+                        using value_t = typename column_t::member_t;
                         value_t value;
-                        err = s.readColumn(columnIdx++, value);
+                        err = stmt.read_column(column_idx++, value);
                         column_t::setter(record, value);
                     }
                 }(), ...);
@@ -193,26 +197,27 @@ namespace zxorm {
         }
 
         template<class T, typename PrimaryKeyType>
-        std::optional<Error> deleteRecord(const PrimaryKeyType& id)
+        std::optional<Error> delete_record(const PrimaryKeyType& id)
         {
-            using table_t = typename TableForClass<T>::type;
+            using table_t = typename table_for_class<T>::type;
 
-            static_assert(table_t::hasPrimaryKey, "Cannot execute a delete on a table without a primary key");
+            static_assert(table_t::has_primary_key, "Cannot execute a delete on a table without a primary key");
 
-            static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::PrimaryKey::MemberType>,
+            static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::primary_key_t::member_t>,
                     "Primary key type does not match the type specified in the definition of the table");
 
-            typename table_t::PrimaryKey::MemberType pk = id;
-            auto query = table_t::deleteQuery();
-            statement_t s = {this, query};
-            if (s.error) {
-                return s.error.value();
+            typename table_t::primary_key_t::member_t pk = id;
+            auto query = table_t::delete_query();
+            auto s = statement_t::create(this, query);
+            if (!s) {
+                return s.error();
             }
-            std::optional<Error> err = s.bind(1, pk);
+            statement_t stmt = s;
+            std::optional<Error> err = stmt.bind(1, pk);
             if (err) {
                 return err.value();
             }
-            err = s.step();
+            err = stmt.step();
             if (err) {
                 return err.value();
             }
