@@ -78,6 +78,7 @@ TEST_F(QueryTest, InsertSomething)
         std::cout << std::string(err.value()) << std::endl;
     }
     ASSERT_FALSE(err);
+    ASSERT_EQ(obj.id, 1);
 }
 
 TEST_F(QueryTest, FindSomething)

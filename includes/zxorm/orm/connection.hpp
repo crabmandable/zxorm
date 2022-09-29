@@ -44,8 +44,99 @@ namespace zxorm {
             using type = typename std::tuple_element<idx, std::tuple<Table...>>::type;
         };
 
+        template<class C>
+        static constexpr bool table_has_integer_primary_key() {
+            using table_t = typename table_for_class<C>::type;
+            if (!table_t::has_primary_key) return false;
+            return table_t::primary_key_t::sql_column_type == sqlite_column_type::INTEGER;
+        }
+
         auto make_statement(const std::string& query) {
             return Statement::create(_db_handle.get(), _logger, query);
+        }
+
+        auto exec(const std::string& query) -> OptionalError {
+            auto stmt = make_statement(query);
+            if (stmt.is_error()) return stmt.error();
+            return stmt.value().step();
+        }
+
+        auto log_error(const Error& err) -> void {
+            _logger(log_level::Error, std::string(err).c_str());
+        }
+
+        inline auto log_error(const OptionalError& err) -> void {
+            log_error(err.value());
+        }
+
+        OptionalError transaction(std::function<OptionalError()> run) {
+            auto err = exec("BEGIN TRANSACTION;");
+            if (err) {
+                _logger(log_level::Error, "Unable to begin transaction");
+                log_error(err);
+                return err;
+            }
+
+            err = run();
+            if (err) {
+                auto rollback_err = exec("ROLLBACK TRANSACTION;");
+                if (rollback_err) {
+                    _logger(log_level::Error, "Unable to rollback transaction during error handling");
+                    log_error(rollback_err);
+                }
+                return err;
+            }
+
+            return exec("COMMIT TRANSACTION;");
+        };
+
+        // the conditional makes it impossible to deduce the type T apparently :(
+        template<class T>
+        OptionalError _insert_record_impl (
+            std::conditional_t<table_has_integer_primary_key<T>(), T&, const T&> record)
+        {
+            using table_t = typename table_for_class<T>::type;
+
+            auto query = table_t::insert_query();
+            auto insert_stmt = make_statement(query);
+            if (!insert_stmt) {
+                return OptionalError(insert_stmt.error());
+            }
+
+            int i = 1;
+            OptionalError err;
+            std::apply([&](const auto&... a) {
+                ([&]() {
+                    if (err) return;
+                    using column_t = std::remove_reference_t<decltype(a)>;
+
+                    if constexpr (!column_t::is_auto_inc_column) {
+                        auto& val = column_t::getter(record);
+                        err = insert_stmt.value().bind(i++, val);
+                    }
+
+                }(), ...);
+            }, typename table_t::columns_t{});
+
+            if (err) {
+                return err;
+            }
+
+            err = insert_stmt.value().step();
+            if (err) {
+                return err;
+            }
+
+            if (!insert_stmt.value().done()) {
+                return Error("Insert query didn't run to completion");
+            }
+
+            if constexpr (table_has_integer_primary_key<T>()) {
+                int64_t value = sqlite3_last_insert_rowid(_db_handle.get());
+                table_t::primary_key_t::setter(record, value);
+            }
+
+            return std::nullopt;
         }
 
     public:
@@ -79,65 +170,48 @@ namespace zxorm {
         Connection(const Connection&) = delete;
         Connection operator =(const Connection&) = delete;
 
-        std::optional<Error> create_tables(bool if_not_exist = true) {
-            // TODO make this a transaction
+        OptionalError create_tables(bool if_not_exist = true) {
 
             std::array<Result<Statement>,  sizeof...(Table)> statements = {make_statement(Table::create_table_query(if_not_exist))...};
 
-            for (auto& s : statements) {
-                if (!s) {
-                    return s.error();
+            return transaction([&]() -> OptionalError {
+                for (auto& s : statements) {
+                    if (!s) {
+                        return s.error();
+                    }
+                    auto error = s.value().step();
+                    if (error) return error;
                 }
-                auto error = s.value().step();
-                if (error) return error;
-            }
 
-            return std::nullopt;
+                return std::nullopt;
+            });
+        }
+
+        Result<size_t> count_tables()
+        {
+            auto count_stmt = make_statement("SELECT COUNT(*) FROM `sqlite_schema` WHERE `type` = 'table';");
+            if (count_stmt.is_error()) return count_stmt.error();
+
+            auto err =  count_stmt.value().step();
+            if (err) return err.value();
+
+            ssize_t count;
+            err = count_stmt.value().read_column(0, count);
+            if (err) return err.value();
+            return count;
         }
 
         template<class T>
-        std::optional<Error> insert_record(const T& record) {
-            using table_t = typename table_for_class<T>::type;
+        OptionalError insert_record (const T& record)
+        {
+            return _insert_record_impl<T>(record);
+        }
 
-            auto query = table_t::insert_query();
-            auto s = make_statement(query);
-            if (!s) {
-                return s.error();
-            }
-
-            Statement stmt = s.value();
-
-            int i = 1;
-            std::optional<Error> err;
-            std::apply([&](const auto&... a) {
-                ([&]() {
-                    if (err) return;
-                    using column_t = std::remove_reference_t<decltype(a)>;
-
-                    if constexpr (!column_t::is_auto_inc_column) {
-                        auto& val = column_t::getter(record);
-                        err = stmt.bind(i++, val);
-                    }
-
-                }(), ...);
-            }, typename table_t::columns_t{});
-
-            if (err) {
-                return err;
-            }
-
-            err = stmt.step();
-            if (err) {
-                return err;
-            }
-
-            if (!stmt.done()) {
-                return Error("Insert query didn't run to completion");
-            }
-
-            // TODO: fill the records primary key if needed
-
-            return std::nullopt;
+        template<class T>
+        requires (table_has_integer_primary_key<T>())
+        OptionalError insert_record (T& record)
+        {
+            return _insert_record_impl<T>(record);
         }
 
         template<class T, typename PrimaryKeyType>
@@ -158,7 +232,7 @@ namespace zxorm {
             }
             Statement stmt = s;
 
-            std::optional<Error> err = stmt.bind(1, pk);
+            OptionalError err = stmt.bind(1, pk);
             if (err) {
                 return err.value();
             }
@@ -200,7 +274,7 @@ namespace zxorm {
         }
 
         template<class T, typename PrimaryKeyType>
-        std::optional<Error> delete_record(const PrimaryKeyType& id)
+        OptionalError delete_record(const PrimaryKeyType& id)
         {
             using table_t = typename table_for_class<T>::type;
 
@@ -216,7 +290,7 @@ namespace zxorm {
                 return s.error();
             }
             Statement stmt = s;
-            std::optional<Error> err = stmt.bind(1, pk);
+            OptionalError err = stmt.bind(1, pk);
             if (err) {
                 return err.value();
             }

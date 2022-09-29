@@ -39,6 +39,8 @@ namespace zxorm {
         }
     };
 
+    using OptionalError = std::optional<Error>;
+
     template<size_t N>
     struct FixedLengthString {
         constexpr FixedLengthString(const char (&str)[N]) {

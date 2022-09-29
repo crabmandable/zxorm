@@ -36,7 +36,7 @@ namespace zxorm {
         }
 
         public:
-        std::optional<Error> error = std::nullopt;
+        OptionalError error = std::nullopt;
 
         [[nodiscard]] static Result<Statement> create(sqlite3* handle, Logger logger, const std::string& query)
         {
@@ -56,7 +56,7 @@ namespace zxorm {
         }
 
         template <ArithmeticT T>
-        [[nodiscard]] std::optional<Error> bind(size_t idx, const T& param)
+        [[nodiscard]] OptionalError bind(size_t idx, const T& param)
         {
             using unwrapped_t = typename remove_optional<T>::type;
             const unwrapped_t* unwrapped;
@@ -93,7 +93,7 @@ namespace zxorm {
         }
 
         template <ContinuousContainer T>
-        [[nodiscard]] std::optional<Error> bind(size_t idx, const T& param)
+        [[nodiscard]] OptionalError bind(size_t idx, const T& param)
         {
             bool bound_null = false;
             int result;
@@ -120,7 +120,7 @@ namespace zxorm {
             return std::nullopt;
         }
 
-        [[nodiscard]] std::optional<Error> rewind() {
+        [[nodiscard]] OptionalError rewind() {
             int result = sqlite3_reset(_stmt.get());
             if (result != SQLITE_OK) {
                 return Error( "Unable to reset statment", result);
@@ -128,7 +128,7 @@ namespace zxorm {
             _done = false;
         }
 
-        [[nodiscard]] std::optional<Error> reset() {
+        [[nodiscard]] OptionalError reset() {
             auto err = rewind();
             if (err) return err;
 
@@ -141,7 +141,7 @@ namespace zxorm {
             return std::nullopt;
         }
 
-        [[nodiscard]] std::optional<Error> step() {
+        [[nodiscard]] OptionalError step() {
             if (_done) {
                 return Error("Query has run to completion");
             }
@@ -163,7 +163,7 @@ namespace zxorm {
         }
 
         template<ContinuousContainer T>
-        [[nodiscard]] std::optional<Error> read_column(size_t idx, T& out_param) {
+        [[nodiscard]] OptionalError read_column(size_t idx, T& out_param) {
             auto out = MetaContainer<T>(out_param);
             int data_type = sqlite3_column_type(_stmt.get(), idx);
             switch(data_type) {
@@ -195,7 +195,7 @@ namespace zxorm {
         }
 
         template<ArithmeticT T>
-        [[nodiscard]] std::optional<Error> read_column(size_t idx, T& out_param) {
+        [[nodiscard]] OptionalError read_column(size_t idx, T& out_param) {
             int data_type = sqlite3_column_type(_stmt.get(), idx);
             switch(data_type) {
                 case SQLITE_INTEGER: {
