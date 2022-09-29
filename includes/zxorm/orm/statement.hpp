@@ -10,7 +10,6 @@
 #include "zxorm/helpers/meta_container.hpp"
 
 namespace zxorm {
-    template <class Connection, class... Table>
     class Statement {
         private:
         Logger _logger;
@@ -39,21 +38,21 @@ namespace zxorm {
         public:
         std::optional<Error> error = std::nullopt;
 
-        [[nodiscard]] static Result<Statement> create(Connection* conn, const std::string& query)
+        [[nodiscard]] static Result<Statement> create(sqlite3* handle, Logger logger, const std::string& query)
         {
             sqlite3_stmt* stmt = nullptr;
-            int result = sqlite3_prepare_v2(conn->_db_handle.get(), query.c_str(), query.size() + 1, &stmt, nullptr);
+            int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
                 const char* str = sqlite3_errstr(result);
-                conn->_logger(log_level::Error, "Unable to initialize statement");
-                conn->_logger(log_level::Error, str);
+                logger(log_level::Error, "Unable to initialize statement");
+                logger(log_level::Error, str);
                 return Error("Unable to initialize statement", result);
             }
 
-            conn->_logger(log_level::Debug, "Initialized statement");
-            conn->_logger(log_level::Debug, query.c_str());
+            logger(log_level::Debug, "Initialized statement");
+            logger(log_level::Debug, query.c_str());
 
-            return Statement(conn->_logger, stmt);
+            return Statement(logger, stmt);
         }
 
         template <ArithmeticT T>

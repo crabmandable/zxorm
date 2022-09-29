@@ -16,8 +16,6 @@ namespace zxorm {
     requires(sizeof...(Table) > 0)
     class Connection {
     private:
-        friend class Statement<Connection, Table...>;
-        using statement_t = Statement<Connection, Table...>;
         using db_handle_ptr = std::unique_ptr<sqlite3, std::function<void(sqlite3*)>>;
 
         Connection(sqlite3* db_handle, Logger logger) {
@@ -45,6 +43,11 @@ namespace zxorm {
             static_assert(idx >= 0, "Connection does not contain any table matching the type T");
             using type = typename std::tuple_element<idx, std::tuple<Table...>>::type;
         };
+
+        auto make_statement(const std::string& query) {
+            return Statement::create(_db_handle.get(), _logger, query);
+        }
+
     public:
         static Result<Connection<Table...>> create(const char* file_name, int flags = 0, const char* z_vfs = nullptr, Logger logger = nullptr) {
             if (!flags) {
@@ -79,7 +82,7 @@ namespace zxorm {
         std::optional<Error> create_tables(bool if_not_exist = true) {
             // TODO make this a transaction
 
-            std::array<Result<statement_t>,  sizeof...(Table)> statements = {statement_t::create(this, Table::create_table_query(if_not_exist))...};
+            std::array<Result<Statement>,  sizeof...(Table)> statements = {make_statement(Table::create_table_query(if_not_exist))...};
 
             for (auto& s : statements) {
                 if (!s) {
@@ -97,12 +100,12 @@ namespace zxorm {
             using table_t = typename table_for_class<T>::type;
 
             auto query = table_t::insert_query();
-            auto s = statement_t::create(this, query);
+            auto s = make_statement(query);
             if (!s) {
                 return s.error();
             }
 
-            statement_t stmt = s.value();
+            Statement stmt = s.value();
 
             int i = 1;
             std::optional<Error> err;
@@ -149,11 +152,11 @@ namespace zxorm {
 
             typename table_t::primary_key_t::member_t pk = id;
             auto query = table_t::find_query();
-            auto s = statement_t::create(this, query);
+            auto s = make_statement(query);
             if (s.is_error()) {
                 return s.error();
             }
-            statement_t stmt = s;
+            Statement stmt = s;
 
             std::optional<Error> err = stmt.bind(1, pk);
             if (err) {
@@ -208,11 +211,11 @@ namespace zxorm {
 
             typename table_t::primary_key_t::member_t pk = id;
             auto query = table_t::delete_query();
-            auto s = statement_t::create(this, query);
+            auto s = make_statement(query);
             if (!s) {
                 return s.error();
             }
-            statement_t stmt = s;
+            Statement stmt = s;
             std::optional<Error> err = stmt.bind(1, pk);
             if (err) {
                 return err.value();
