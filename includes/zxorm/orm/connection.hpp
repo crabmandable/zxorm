@@ -247,15 +247,17 @@ namespace zxorm {
         std::array<Result<Statement>,  sizeof...(Table)> statements = {make_statement(Table::create_table_query(if_not_exist))...};
 
         return transaction([&]() -> OptionalError {
+            OptionalError error;
             for (auto& s : statements) {
                 if (!s) {
-                    return s.error();
+                    error = s.error();
+                    break;
                 }
-                auto error = s.value().step();
-                if (error) return error;
+                error = s.value().step();
+                if (error) break;
             }
 
-            return std::nullopt;
+            return error;
         });
     }
 

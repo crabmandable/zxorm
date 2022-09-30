@@ -36,8 +36,6 @@ namespace zxorm {
         }
 
         public:
-        OptionalError error = std::nullopt;
-
         [[nodiscard]] static Result<Statement> create(sqlite3* handle, Logger logger, const std::string& query)
         {
             sqlite3_stmt* stmt = nullptr;
@@ -126,6 +124,7 @@ namespace zxorm {
                 return Error( "Unable to reset statment", result);
             }
             _done = false;
+            return std::nullopt;
         }
 
         [[nodiscard]] OptionalError reset() {

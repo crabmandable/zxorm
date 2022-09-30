@@ -25,13 +25,20 @@ using table_t = Table<"test", Object,
     Column<"someOptionaBuffer", &Object::some_optional_buffer>
         >;
 
-using connection_t = Connection<table_t>;
+struct OtherObj {
+    std::string some_text;
+};
+
+using pk_is_text_t = Table<"test2", OtherObj,
+    Column<"text", &OtherObj::some_text, PrimaryKey<conflict_t::abort>>>;
+
+using connection_t = Connection<table_t, pk_is_text_t>;
 
 class QueryTest : public ::testing::Test {
     protected:
     void SetUp() override {
         auto created_conn = connection_t::create("test.db", 0, 0, &logger);
-        ASSERT_TRUE(created_conn);
+        ASSERT_FALSE(created_conn.is_error());
 
         my_conn = std::make_shared<connection_t>(created_conn.value());
 
@@ -79,6 +86,18 @@ TEST_F(QueryTest, InsertSomething)
     }
     ASSERT_FALSE(err);
     ASSERT_EQ(obj.id, 1);
+}
+
+TEST_F(QueryTest, InsertObjWithoutRowId)
+{
+    OtherObj obj = { .some_text = "Some text" };
+
+    auto err = my_conn->insert_record(obj);
+    if (err) {
+        std::cout << std::string(err.value()) << std::endl;
+    }
+
+    ASSERT_FALSE(err);
 }
 
 TEST_F(QueryTest, FindSomething)
@@ -155,6 +174,6 @@ TEST_F(QueryTest, DeleteSomething)
     err = my_conn->delete_record<Object>(1);
     ASSERT_FALSE(err);
     auto result = my_conn->find_record<Object>(1);
-    ASSERT_TRUE(result);
+    ASSERT_FALSE(result.is_error());
     ASSERT_FALSE(result.value());
 }

@@ -7,19 +7,51 @@ namespace zxorm {
         protected:
         std::variant<Error, T> _result;
 
+        // For debug builds we want to ensure that all potential
+        // errors have been checked before the value can be recieved
+#ifndef NDEBUG
+        bool _err_was_checked = false;
+#endif
+        void set_error_checked() ZXORM_CONST_UNLESS_DEBUG {
+#ifndef NDEBUG
+            _err_was_checked = true;
+#endif
+        }
+
+        void enforce_error_checked() const {
+#ifndef NDEBUG
+            assert(_err_was_checked);
+#endif
+        }
+
         public:
         Result(const Result& r) = delete;
         Result& operator = (const Result&) = delete;
-        Result(Result&& r) = default;
-        Result& operator = (Result&&) = default;
+
+        Result& operator = (Result&& old) {
+#ifndef NDEBUG
+            _err_was_checked = old._err_was_checked;
+            old._err_was_checked = true;
+#endif
+            _result = std::move(old._result);
+            return *this;
+        }
+
+        Result(Result&& old) {
+            *this = std::move(old);
+        }
+
         Result(T r) : _result{std::move(r)} {}
         Result(Error r) : _result{std::move(r)} {}
 
-        bool is_error() const {
+        bool is_error() ZXORM_CONST_UNLESS_DEBUG
+        {
+            set_error_checked();
             return std::holds_alternative<Error>(_result);
         }
 
-        operator bool () const {
+        operator bool () ZXORM_CONST_UNLESS_DEBUG
+        {
             return !is_error();
         }
 
@@ -32,10 +64,12 @@ namespace zxorm {
         }
 
         operator const T& () const {
+            enforce_error_checked();
             return std::get<T>(_result);
         }
 
         operator T&& () {
+            enforce_error_checked();
             return std::move(std::get<T>(_result));
         }
 

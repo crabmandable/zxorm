@@ -110,8 +110,7 @@ TEST_F(TableCreationTest, CreateManyTables) {
 TEST_F(TableCreationTest, AllOrNothingTransaction) {
     auto my_conn = make_connection<table_one_t, table_one_t, table_three_t>();
     auto err = my_conn->create_tables(false);
-    if (err) std::cout << std::string(err.value()) << std::endl;
-    ASSERT_TRUE(err);
+    ASSERT_TRUE(err.has_value());
 
     auto count = my_conn->count_tables();
     ASSERT_FALSE(count.is_error());

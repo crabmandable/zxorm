@@ -8,6 +8,12 @@
 #include <sstream>
 #include <iterator>
 
+#ifndef NDEBUG
+#define ZXORM_CONST_UNLESS_DEBUG
+#else
+#define ZXORM_CONST_UNLESS_DEBUG const
+#endif
+
 namespace zxorm {
     enum class log_level {
         Error = 0,
@@ -39,7 +45,59 @@ namespace zxorm {
         }
     };
 
-    using OptionalError = std::optional<Error>;
+    struct OptionalError {
+    private:
+        std::optional<Error> _err;
+
+    public:
+        OptionalError(auto value) : _err{value} {}
+        OptionalError() = default;
+        OptionalError(const OptionalError&) = delete;
+        OptionalError& operator=(const OptionalError&) = delete;
+
+        OptionalError& operator=(OptionalError&& old) {
+#ifndef NDEBUG
+            _err_was_checked = old._err_was_checked;
+            old._err_was_checked = true;
+#endif
+            _err = old._err;
+            return *this;
+        }
+
+        OptionalError(OptionalError&& old) {
+            *this = std::move(old);
+        }
+
+#ifndef NDEBUG
+        bool _err_was_checked = false;
+#endif
+        void set_err_checked() ZXORM_CONST_UNLESS_DEBUG {
+#ifndef NDEBUG
+            _err_was_checked = true;
+#endif
+        }
+
+        bool has_value() ZXORM_CONST_UNLESS_DEBUG {
+            set_err_checked();
+            return _err.has_value();
+        }
+
+        operator bool () ZXORM_CONST_UNLESS_DEBUG {
+            set_err_checked();
+            return has_value();
+        }
+
+        auto value() ZXORM_CONST_UNLESS_DEBUG {
+            set_err_checked();
+            return _err.value();
+        }
+
+        ~OptionalError() {
+#ifndef NDEBUG
+            assert(_err_was_checked);
+#endif
+        }
+    };
 
     template<size_t N>
     struct FixedLengthString {
