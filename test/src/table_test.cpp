@@ -66,9 +66,8 @@ class TableTest : public ::testing::Test {
     protected:
     void SetUp() override {
         auto created_conn = connection_t::create("test.db", 0, 0, &logger);
-        if (!created_conn) {
-            throw "Unable to open connection";
-        }
+
+        ASSERT_TRUE(created_conn);
 
         my_conn = std::make_shared<connection_t>(created_conn.value());
     }

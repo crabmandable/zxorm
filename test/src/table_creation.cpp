@@ -58,11 +58,11 @@ class TableCreationTest : public ::testing::Test {
 };
 
 template<typename... T>
-auto make_connection() {
+auto make_connection() -> std::shared_ptr<Connection<T...>> {
     using connection_t = Connection<T...>;
     auto created_conn = connection_t::create("test.db", 0, 0, &logger);
     if (!created_conn) {
-        throw "Unable to open connection";
+        return nullptr;
     }
     return std::make_shared<connection_t>(created_conn.value());
 }

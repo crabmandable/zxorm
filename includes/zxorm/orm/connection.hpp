@@ -2,6 +2,7 @@
 
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
+#include "zxorm/error.hpp"
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/result.hpp"
 #include <functional>
@@ -171,14 +172,9 @@ namespace zxorm {
     template <class... Table>
     OptionalError Connection<Table...>::transaction(std::function<OptionalError()> run)
     {
-        auto err = exec("BEGIN TRANSACTION;");
-        if (err) {
-            _logger(log_level::Error, "Unable to begin transaction");
-            log_error(err);
-            return err;
-        }
+        ZXORM_TRY(exec("BEGIN TRANSACTION;"));
 
-        err = run();
+        auto err = run();
         if (err) {
             auto rollback_err = exec("ROLLBACK TRANSACTION;");
             if (rollback_err) {
@@ -199,10 +195,7 @@ namespace zxorm {
         using table_t = typename table_for_class<T>::type;
 
         auto query = table_t::insert_query();
-        auto insert_stmt = make_statement(query);
-        if (!insert_stmt) {
-            return OptionalError(insert_stmt.error());
-        }
+        ZXORM_GET_RESULT(Statement insert_stmt, make_statement(query));
 
         int i = 1;
         OptionalError err;
@@ -213,7 +206,7 @@ namespace zxorm {
 
                 if constexpr (!column_t::is_auto_inc_column) {
                     auto& val = column_t::getter(record);
-                    err = insert_stmt.value().bind(i++, val);
+                    err = insert_stmt.bind(i++, val);
                 }
 
             }(), ...);
@@ -223,12 +216,9 @@ namespace zxorm {
             return err;
         }
 
-        err = insert_stmt.value().step();
-        if (err) {
-            return err;
-        }
+        ZXORM_TRY(insert_stmt.step());
 
-        if (!insert_stmt.value().done()) {
+        if (!insert_stmt.done()) {
             return Error("Insert query didn't run to completion");
         }
 
@@ -244,35 +234,32 @@ namespace zxorm {
     OptionalError Connection<Table...>::create_tables(bool if_not_exist)
     {
 
-        std::array<Result<Statement>,  sizeof...(Table)> statements = {make_statement(Table::create_table_query(if_not_exist))...};
+        std::array<Result<Statement>,  sizeof...(Table)> statements =
+            { make_statement(Table::create_table_query(if_not_exist))... };
 
         return transaction([&]() -> OptionalError {
-            OptionalError error;
             for (auto& s : statements) {
                 if (!s) {
-                    error = s.error();
-                    break;
+                    return s.error();
                 }
-                error = s.value().step();
-                if (error) break;
+                ZXORM_TRY(s.value().step());
             }
 
-            return error;
+            return std::nullopt;
         });
     }
 
     template <class... Table>
     Result<size_t> Connection<Table...>::count_tables()
     {
-        auto count_stmt = make_statement("SELECT COUNT(*) FROM `sqlite_schema` WHERE `type` = 'table';");
-        if (count_stmt.is_error()) return count_stmt.error();
+        ZXORM_GET_RESULT(
+                auto count_stmt,
+                make_statement("SELECT COUNT(*) FROM `sqlite_schema` WHERE `type` = 'table';"));
 
-        auto err =  count_stmt.value().step();
-        if (err) return err.value();
+        ZXORM_TRY(count_stmt.step());
 
         ssize_t count;
-        err = count_stmt.value().read_column(0, count);
-        if (err) return err.value();
+        ZXORM_TRY(count_stmt.read_column(0, count));
         return count;
     }
 
@@ -289,31 +276,23 @@ namespace zxorm {
 
         typename table_t::primary_key_t::member_t pk = id;
         auto query = table_t::find_query();
-        auto s = make_statement(query);
-        if (s.is_error()) {
-            return s.error();
-        }
-        Statement stmt = s;
 
-        OptionalError err = stmt.bind(1, pk);
-        if (err) {
-            return err.value();
-        }
-        err = stmt.step();
-        if (err) {
-            return err.value();
-        }
+        ZXORM_GET_RESULT(Statement stmt, make_statement(query));
+        ZXORM_TRY(stmt.bind(1, pk));
+        ZXORM_TRY(stmt.step());
 
         if (stmt.done()) {
             return std::nullopt;
         }
 
         if (stmt.column_count() != table_t::n_columns) {
-            return Error("Unexpected number of columns returned by find query");
+            return Error("Unexpected number of columns returned by find query,"
+                    " tables may not be synced");
         }
 
         T record;
         size_t column_idx = 0;
+        OptionalError err;
         std::apply([&](const auto&... a) {
             ([&]() {
                 if (err) return;
@@ -349,19 +328,10 @@ namespace zxorm {
 
         typename table_t::primary_key_t::member_t pk = id;
         auto query = table_t::delete_query();
-        auto s = make_statement(query);
-        if (!s) {
-            return s.error();
-        }
-        Statement stmt = s;
-        OptionalError err = stmt.bind(1, pk);
-        if (err) {
-            return err.value();
-        }
-        err = stmt.step();
-        if (err) {
-            return err.value();
-        }
+
+        ZXORM_GET_RESULT(Statement stmt, make_statement(query));
+        ZXORM_TRY(stmt.bind(1, pk));
+        ZXORM_TRY(stmt.step());
 
         return std::nullopt;
     }

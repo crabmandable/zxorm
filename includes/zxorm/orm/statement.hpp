@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zxorm/common.hpp"
+#include "zxorm/error.hpp"
 #include "zxorm/orm/types.hpp"
 #include <cassert>
 #include <cstring>

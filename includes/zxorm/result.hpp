@@ -1,5 +1,12 @@
 #pragma once
 #include "zxorm/common.hpp"
+#include "zxorm/error.hpp"
+
+#define ZXORM_GET_RESULT(lhs, rhs)                      \
+        auto _temp_result##__LINE__ = (rhs);                   \
+        if (_temp_result##__LINE__.is_error()) [[unlikely]]    \
+            return _temp_result##__LINE__.error();             \
+        lhs = _temp_result##__LINE__.value();
 
 namespace zxorm {
     template <class T>
