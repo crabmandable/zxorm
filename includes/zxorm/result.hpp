@@ -3,16 +3,16 @@
 
 namespace zxorm {
     template <class T>
-    struct Result {
+    struct [[nodiscard]] Result {
         protected:
         std::variant<Error, T> _result;
 
         // For debug builds we want to ensure that all potential
         // errors have been checked before the value can be recieved
 #ifndef NDEBUG
-        bool _err_was_checked = false;
+        mutable bool _err_was_checked = false;
 #endif
-        void set_error_checked() ZXORM_CONST_UNLESS_DEBUG {
+        void set_error_checked() const {
 #ifndef NDEBUG
             _err_was_checked = true;
 #endif
@@ -44,13 +44,13 @@ namespace zxorm {
         Result(T r) : _result{std::move(r)} {}
         Result(Error r) : _result{std::move(r)} {}
 
-        bool is_error() ZXORM_CONST_UNLESS_DEBUG
+        bool is_error() const
         {
             set_error_checked();
             return std::holds_alternative<Error>(_result);
         }
 
-        operator bool () ZXORM_CONST_UNLESS_DEBUG
+        operator bool () const
         {
             return !is_error();
         }

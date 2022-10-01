@@ -28,7 +28,7 @@ namespace zxorm {
         template<class C> static constexpr bool table_has_rowid();
 
         void log_error(const Error& err);
-        inline void log_error(ZXORM_CONST_UNLESS_DEBUG OptionalError& err);
+        inline void log_error(const OptionalError& err);
 
         auto make_statement(const std::string& query);
         auto exec(const std::string& query) -> OptionalError;
@@ -161,7 +161,7 @@ namespace zxorm {
     }
 
     template <class... Table>
-    inline void Connection<Table...>::log_error(ZXORM_CONST_UNLESS_DEBUG OptionalError& err)
+    inline void Connection<Table...>::log_error(const OptionalError& err)
     {
         if (err) {
             log_error(err.value());

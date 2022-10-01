@@ -8,12 +8,6 @@
 #include <sstream>
 #include <iterator>
 
-#ifndef NDEBUG
-#define ZXORM_CONST_UNLESS_DEBUG
-#else
-#define ZXORM_CONST_UNLESS_DEBUG const
-#endif
-
 namespace zxorm {
     enum class log_level {
         Error = 0,
@@ -45,7 +39,7 @@ namespace zxorm {
         }
     };
 
-    struct OptionalError {
+    struct [[nodiscard]] OptionalError {
     private:
         std::optional<Error> _err;
 
@@ -69,25 +63,25 @@ namespace zxorm {
         }
 
 #ifndef NDEBUG
-        bool _err_was_checked = false;
+        mutable bool _err_was_checked = false;
 #endif
-        void set_err_checked() ZXORM_CONST_UNLESS_DEBUG {
+        void set_err_checked() const {
 #ifndef NDEBUG
             _err_was_checked = true;
 #endif
         }
 
-        bool has_value() ZXORM_CONST_UNLESS_DEBUG {
+        bool has_value() const {
             set_err_checked();
             return _err.has_value();
         }
 
-        operator bool () ZXORM_CONST_UNLESS_DEBUG {
+        operator bool () const {
             set_err_checked();
             return has_value();
         }
 
-        auto value() ZXORM_CONST_UNLESS_DEBUG {
+        auto value() const {
             set_err_checked();
             return _err.value();
         }
