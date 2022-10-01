@@ -91,13 +91,13 @@ namespace zxorm {
     namespace ignore_qualifiers {
         template<typename T>
         static constexpr bool is_continuous_container() {
-            using plain = remove_optional<std::remove_cvref_t<T>>::type;
+            using plain = typename remove_optional<std::remove_cvref_t<T>>::type;
             return traits::is_vector<plain>() || traits::is_basic_string<plain>() || traits::is_array<plain>();
         }
 
         template<typename T>
         static constexpr bool is_arithmetic() {
-            using plain = remove_optional<std::remove_cvref_t<T>>::type;
+            using plain = typename remove_optional<std::remove_cvref_t<T>>::type;
             return std::is_arithmetic_v<plain>;
         }
 
@@ -109,13 +109,13 @@ namespace zxorm {
 
         template <typename T>
         static constexpr bool is_string() {
-            using plain = remove_optional<std::remove_cvref_t<T>>::type;
+            using plain = typename remove_optional<std::remove_cvref_t<T>>::type;
             return traits::is_basic_string<plain>();
         }
 
         template <typename T>
         static constexpr bool is_floating_point() {
-            using plain = remove_optional<std::remove_cvref_t<T>>::type;
+            using plain = typename remove_optional<std::remove_cvref_t<T>>::type;
             return std::is_floating_point_v<plain>;
         }
     };

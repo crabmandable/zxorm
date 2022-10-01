@@ -66,7 +66,7 @@ namespace zxorm {
     class MetaContainer<C> {
         private:
         C& _container;
-        using PlainC = remove_optional<std::remove_cvref_t<C>>::type;
+        using PlainC = typename remove_optional<std::remove_cvref_t<C>>::type;
 
         public:
         MetaContainer(C& c) : _container{c} {}
