@@ -69,5 +69,18 @@ namespace zxorm {
         iterator end() {
             return iterator();
         }
+
+        Result<std::vector<record_t>> to_vector() {
+            std::vector<record_t> records;
+            for(OptionalResult<record_t>& result: *this) {
+                if (result.is_error()) {
+                    return result.error();
+                }
+                if (result.value()) {
+                    records.emplace_back(result.value().value());
+                }
+            }
+            return records;
+        }
     };
 };

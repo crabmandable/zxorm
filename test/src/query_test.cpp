@@ -194,10 +194,35 @@ TEST_F(QueryTest, WhereEq)
     ASSERT_FALSE(result.is_error());
 
     auto iter = result.value();
-    for (const auto& record: iter) {
-        ASSERT_FALSE(record.is_error());
-        ASSERT_TRUE(record.value());
-        // value value ? eww
-        std::cout << record.value().value().some_id << std::endl;
+    int i = 0;
+    for (const auto& result: iter) {
+        // we should only see one record
+        ASSERT_TRUE(i++ < 1);
+        ASSERT_FALSE(result.is_error());
+        ASSERT_TRUE(result.value());
+
+        // ew valuevalue
+        auto& record = result.value().value();
+
+        ASSERT_EQ(obj.id, record.id);
+        ASSERT_EQ(1, record.id);
+        ASSERT_EQ(obj.some_text, record.some_text);
+        ASSERT_EQ(obj.some_id, record.some_id);
+        ASSERT_EQ(obj.some_float, record.some_float);
+        ASSERT_EQ(obj.some_optional, record.some_optional);
+        ASSERT_EQ(obj.some_optional_buffer, record.some_optional_buffer);
     }
+
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 1);
+
+    auto& record = vec.value()[0];
+    ASSERT_EQ(obj.id, record.id);
+    ASSERT_EQ(1, record.id);
+    ASSERT_EQ(obj.some_text, record.some_text);
+    ASSERT_EQ(obj.some_id, record.some_id);
+    ASSERT_EQ(obj.some_float, record.some_float);
+    ASSERT_EQ(obj.some_optional, record.some_optional);
+    ASSERT_EQ(obj.some_optional_buffer, record.some_optional_buffer);
 }
