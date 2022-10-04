@@ -24,7 +24,17 @@ namespace zxorm {
             std::copy_n(str, N, value);
         }
 
+        template<typename OtherFLStr>
+        consteval bool operator==(const OtherFLStr& other) const {
+            if (other.size != size) return false;
+            for (size_t i = 0; i < N; i++) {
+                if (value[i] != other.value[i]) return false;
+            }
+            return true;
+        }
+
         char value[N];
+        static constexpr size_t size = N;
     };
 
     template<FixedLengthString delim, FixedLengthString...string>

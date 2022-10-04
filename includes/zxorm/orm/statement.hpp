@@ -18,6 +18,7 @@ namespace zxorm {
         size_t _parameter_count;
         std::map<size_t, bool> _is_bound;
         int _column_count = 0;
+        size_t _step_count = 0;
         bool _done = false;
 
         Statement(Logger logger, sqlite3_stmt* stmt) : _logger{logger} {
@@ -57,6 +58,8 @@ namespace zxorm {
         template <ArithmeticT T>
         [[nodiscard]] OptionalError bind(size_t idx, const T& param)
         {
+            // bindings start at 1 :(
+            assert(idx != 0);
             using unwrapped_t = typename remove_optional<T>::type;
             const unwrapped_t* unwrapped;
             int result;
@@ -125,6 +128,7 @@ namespace zxorm {
                 return Error( "Unable to reset statment", result);
             }
             _done = false;
+            _step_count = 0;
             return std::nullopt;
         }
 
@@ -151,6 +155,7 @@ namespace zxorm {
             }
 
             int result = sqlite3_step(_stmt.get());
+            _step_count++;
             if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
                 return Error("Unable to execute statment", result);
             }
@@ -241,5 +246,6 @@ namespace zxorm {
 
         int column_count() { return _column_count; }
         bool done() { return _done; }
+        bool step_count() { return _step_count; }
     };
 };

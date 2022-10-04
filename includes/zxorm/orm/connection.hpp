@@ -4,6 +4,7 @@
 #include "zxorm/common.hpp"
 #include "zxorm/error.hpp"
 #include "zxorm/orm/statement.hpp"
+#include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/result.hpp"
 #include <functional>
 #include <sstream>
@@ -68,10 +69,14 @@ namespace zxorm {
             { return insert_record_impl<T>(record); }
 
         template<class T, typename PrimaryKeyType>
-            OptionalResult<T> find_record(const PrimaryKeyType& id);
+            [[nodiscard]] OptionalResult<T> find_record(const PrimaryKeyType& id);
 
         template<class T, typename PrimaryKeyType>
             OptionalError delete_record(const PrimaryKeyType& id);
+
+        template<class T, class Expression>
+            [[nodiscard]] auto where(const Expression& e) ->
+                Result<RecordIterator<typename table_for_class<T>::type>>;
     };
 
     template <class... Table>
@@ -281,38 +286,7 @@ namespace zxorm {
         ZXORM_TRY(stmt.bind(1, pk));
         ZXORM_TRY(stmt.step());
 
-        if (stmt.done()) {
-            return std::nullopt;
-        }
-
-        if (stmt.column_count() != table_t::n_columns) {
-            return Error("Unexpected number of columns returned by find query,"
-                    " tables may not be synced");
-        }
-
-        T record;
-        size_t column_idx = 0;
-        OptionalError err;
-        std::apply([&](const auto&... a) {
-            ([&]() {
-                if (err) return;
-                using column_t = std::remove_reference_t<decltype(a)>;
-                if constexpr (column_t::public_column) {
-                    err = stmt.read_column(column_idx++, column_t::getter(record));
-                } else {
-                    using value_t = typename column_t::member_t;
-                    value_t value;
-                    err = stmt.read_column(column_idx++, value);
-                    column_t::setter(record, value);
-                }
-            }(), ...);
-        }, typename table_t::columns_t{});
-
-        if (err) {
-            return err.value();
-        }
-
-        return record;
+        return table_t::get_row(stmt);
     }
 
     template <class... Table>
@@ -334,5 +308,28 @@ namespace zxorm {
         ZXORM_TRY(stmt.step());
 
         return std::nullopt;
+    }
+
+    template <class... Table>
+    template<class T, class Expression>
+    auto Connection<Table...>::where(const Expression& e) ->
+        Result<RecordIterator<typename Connection<Table...>::table_for_class<T>::type>>
+    {
+        using table_t = typename table_for_class<T>::type;
+        auto query = table_t::where_query(e);
+        ZXORM_GET_RESULT(Statement stmt, make_statement(query));
+
+        OptionalError err;
+        size_t i = 1;
+        std::apply([&](const auto&... binding) {
+            ([&]() {
+                if (err) return;
+                err = stmt.bind(i++, binding);
+            }(), ...);
+        }, e.bindings());
+
+        if (err) return err.value();
+
+        return RecordIterator<table_t>(std::move(stmt));
     }
 };

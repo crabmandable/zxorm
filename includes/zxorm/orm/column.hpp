@@ -70,7 +70,8 @@ namespace zxorm {
         static constexpr bool is_primary_key = any_of<constraint_is_primary_key<Constraint>::value...>;
         static constexpr bool is_auto_inc_column = any_of<constraint_is_primary_key<Constraint>::value...> && sql_column_type == sqlite_column_type::INTEGER;
 
-        static constexpr const char* name() { return column_name.value; }
+        static constexpr auto name = column_name;
+
         static auto& getter(auto& obj) { return obj.*M; };
         static void setter(auto& obj, auto arg) { obj.*M = arg; };
 
@@ -143,7 +144,8 @@ namespace zxorm {
         static constexpr bool is_primary_key = any_of<constraint_is_primary_key<Constraint>::value...>;
         static constexpr bool is_auto_inc_column = any_of<constraint_is_primary_key<Constraint>::value...> && sql_column_type == sqlite_column_type::INTEGER;
 
-        static constexpr const char* name() { return column_name.value; }
+        static constexpr auto name = column_name;
+
         static auto& getter(auto& obj) { return (obj.*Getter)(); };
         static void setter(auto& obj, auto arg) { (obj.*Setter)(arg); };
 

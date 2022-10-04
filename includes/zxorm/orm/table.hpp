@@ -5,15 +5,17 @@
 #include "zxorm/common.hpp"
 #include "zxorm/orm/types.hpp"
 #include "zxorm/orm/column.hpp"
+#include "zxorm/orm/field.hpp"
 
 namespace zxorm {
 
-template<class Column, class Table>
-concept ColumnBelongingToClass = std::is_same<typename Column::object_class, Table>::value;
-
-template <FixedLengthString table_name, class T, ColumnBelongingToClass<T>... Column>
+template <FixedLengthString table_name, class T, class... Column>
 class Table {
-    private:
+    static_assert(all_of<std::is_same<typename Column::object_class, T>::value...>,
+        "Columns must all belong to the table"
+    );
+    static_assert(std::is_default_constructible_v<T>, "Record type must have a default constructor");
+    public:
         template <typename... C>
         struct find_primary_key {
             static constexpr int primary_key_index = -1;
@@ -28,13 +30,20 @@ class Table {
             using type = typename std::tuple_element<primary_key_index, std::tuple<Column...>>::type;
         };
 
-    public:
-        static std::string column_name(int idx) {
-            int i = 0;
-            std::string name;
-            ((name = i == idx ? Column::name() : name, i++), ...);
-            return name;
-        }
+        template <FixedLengthString name>
+        struct column_by_name
+        {
+            static constexpr int column_idx = -1;
+            using type = std::false_type;
+        };
+
+        template <FixedLengthString name>
+        requires (index_of_first<name == Column::name...>::value > 0)
+        struct column_by_name<name>
+        {
+            static constexpr int column_idx = index_of_first<name == Column::name...>::value;
+            using type = typename std::tuple_element<column_idx, std::tuple<Column...>>::type;
+        };
 
         static constexpr int n_columns = std::tuple_size<std::tuple<Column...>>();
         static constexpr bool has_primary_key = any_of<Column::is_primary_key...>;
@@ -44,6 +53,9 @@ class Table {
         using object_class = T;
         using columns_t = std::tuple<Column...>;
 
+        template <FixedLengthString name>
+        static inline Field<Table, name> field = Field<Table, name>();
+
         static std::string create_table_query(bool if_not_exist) {
             std::stringstream query;
             query << "CREATE TABLE ";
@@ -51,7 +63,7 @@ class Table {
                 query << "IF NOT EXISTS ";
             query << table_name.value << " (\n";
             ([&] {
-                query << '\t' << "`" << Column::name() << "` "
+                query << '\t' << "`" << Column::name.value << "` "
                     << sql_type_str(Column::sql_column_type);
 
                 auto constraints = Column::constraint_creation_query();
@@ -71,7 +83,7 @@ class Table {
         static std::string find_query() {
             std::ostringstream ss;
             ss << "SELECT * FROM `" << table_name.value << "` ";
-            ss << "WHERE `" << primary_key_t::name() << "` = ?;";
+            ss << "WHERE `" << primary_key_t::name.value << "` = ?;";
 
             return ss.str();
         }
@@ -79,7 +91,7 @@ class Table {
         static std::string delete_query() {
             std::ostringstream ss;
             ss << "DELETE FROM `" << table_name.value << "` ";
-            ss << "WHERE `" << primary_key_t::name() << "` = ?;";
+            ss << "WHERE `" << primary_key_t::name.value << "` = ?;";
 
             return ss.str();
         }
@@ -95,7 +107,7 @@ class Table {
                     if constexpr (column_t::is_auto_inc_column) {
                         n_query_columns--;
                     } else {
-                        ss << "`" << column_t::name() << "`, ";
+                        ss << "`" << column_t::name.value << "`, ";
                     }
                 }(), ...);
             }, columns_t{});
@@ -114,6 +126,49 @@ class Table {
             }
 
             return str + ss2.str();
+        }
+
+        static std::string where_query(const auto& expression) {
+            std::ostringstream ss;
+            ss << "SELECT * FROM `" << table_name.value << "` ";
+            ss << "WHERE " << expression;
+            return ss.str();
+        }
+
+        static OptionalResult<T> get_row(Statement& stmt)
+        {
+            if (stmt.done()) {
+                return std::nullopt;
+            }
+
+            if (stmt.column_count() != n_columns) {
+                return Error("Unexpected number of columns returned by find query,"
+                        " tables may not be synced");
+            }
+
+            T record;
+            size_t column_idx = 0;
+            OptionalError err;
+            std::apply([&](const auto&... a) {
+                ([&]() {
+                    if (err) return;
+                    using column_t = std::remove_reference_t<decltype(a)>;
+                    if constexpr (column_t::public_column) {
+                        err = stmt.read_column(column_idx++, column_t::getter(record));
+                    } else {
+                        using value_t = typename column_t::member_t;
+                        value_t value;
+                        err = stmt.read_column(column_idx++, value);
+                        column_t::setter(record, value);
+                    }
+                }(), ...);
+            }, columns_t{});
+
+            if (err) {
+                return err.value();
+            }
+
+            return record;
         }
 };
 

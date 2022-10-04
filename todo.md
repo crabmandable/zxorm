@@ -27,5 +27,7 @@
 
 * Statement caching
 
+* REGEXP
+
 FIX:
     duplicate column class

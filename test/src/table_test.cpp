@@ -81,19 +81,6 @@ class TableTest : public ::testing::Test {
 };
 
 
-TEST_F(TableTest, Columns) {
-    table_t table;
-
-    ASSERT_EQ(table.column_name(0), "id");
-    ASSERT_EQ(table.column_name(1), "name");
-}
-
-TEST_F(TableTest, ColumnsPrivate) {
-    tablepriv_t table;
-    ASSERT_EQ(table.column_name(0), "id");
-    ASSERT_EQ(table.column_name(1), "name");
-}
-
 TEST_F(TableTest, n_columns) {
     ASSERT_EQ(table_t::n_columns, 2);
 }

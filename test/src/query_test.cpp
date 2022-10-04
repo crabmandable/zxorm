@@ -22,7 +22,7 @@ using table_t = Table<"test", Object,
     Column<"bool", &Object::some_bool>,
     Column<"some_id", &Object::some_id >,
     Column<"some_optional", &Object::some_optional>,
-    Column<"someOptionaBuffer", &Object::some_optional_buffer>
+    Column<"some_optional_buffer", &Object::some_optional_buffer>
         >;
 
 struct OtherObj {
@@ -176,4 +176,28 @@ TEST_F(QueryTest, DeleteSomething)
     auto result = my_conn->find_record<Object>(1);
     ASSERT_FALSE(result.is_error());
     ASSERT_FALSE(result.value());
+}
+
+TEST_F(QueryTest, WhereEq)
+{
+    Object obj;
+    obj.some_text = "Some text";
+    obj.some_float = 3.14;
+    obj.some_id = 42;
+    obj.some_optional = 42.333;
+    obj.some_optional_buffer = {'y', 'o'};
+
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+    auto result = my_conn->where<Object>(table_t::field<"some_id"> == 42);
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    for (const auto& record: iter) {
+        ASSERT_FALSE(record.is_error());
+        ASSERT_TRUE(record.value());
+        // value value ? eww
+        std::cout << record.value().value().some_id << std::endl;
+    }
 }
