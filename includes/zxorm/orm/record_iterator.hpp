@@ -13,13 +13,13 @@ namespace zxorm {
     public:
         RecordIterator(Statement&& stmt) : _stmt{std::move(stmt)} { }
 
-        class iterator:  public std::iterator<std::input_iterator_tag, OptionalResult<record_t>>
+        class iterator
         {
         private:
             Statement* _stmt = nullptr;
-            OptionalResult<record_t> _current = std::nullopt;
+            Result<record_t> _current = Error("No result");
         public:
-            using value_type = OptionalResult<record_t>;
+            using value_type = Result<record_t>;
             using iterator_category = std::input_iterator_tag;
 
             iterator(Statement& stmt): _stmt{&stmt} {
@@ -40,7 +40,7 @@ namespace zxorm {
                 return *this;
             }
 
-            OptionalResult<record_t>& operator*() {
+            Result<record_t>& operator*() {
                 return _current;
             }
             bool operator==(const iterator& other) const {
@@ -72,13 +72,11 @@ namespace zxorm {
 
         Result<std::vector<record_t>> to_vector() {
             std::vector<record_t> records;
-            for(OptionalResult<record_t>& result: *this) {
+            for(Result<record_t>& result: *this) {
                 if (result.is_error()) {
                     return result.error();
                 }
-                if (result.value()) {
-                    records.emplace_back(result.value().value());
-                }
+                records.emplace_back(result.value());
             }
             return records;
         }

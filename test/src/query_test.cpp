@@ -199,11 +199,8 @@ TEST_F(QueryTest, WhereEq)
         // we should only see one record
         ASSERT_TRUE(i++ < 1);
         ASSERT_FALSE(result.is_error());
-        ASSERT_TRUE(result.value());
 
-        // ew valuevalue
-        auto& record = result.value().value();
-
+        auto& record = result.value();
         ASSERT_EQ(obj.id, record.id);
         ASSERT_EQ(1, record.id);
         ASSERT_EQ(obj.some_text, record.some_text);

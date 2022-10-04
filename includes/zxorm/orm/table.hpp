@@ -135,12 +135,8 @@ class Table {
             return ss.str();
         }
 
-        static OptionalResult<T> get_row(Statement& stmt)
+        static Result<T> get_row(Statement& stmt)
         {
-            if (stmt.done()) {
-                return std::nullopt;
-            }
-
             if (stmt.column_count() != n_columns) {
                 return Error("Unexpected number of columns returned by find query,"
                         " tables may not be synced");

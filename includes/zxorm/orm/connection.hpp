@@ -286,6 +286,10 @@ namespace zxorm {
         ZXORM_TRY(stmt.bind(1, pk));
         ZXORM_TRY(stmt.step());
 
+        if (stmt.done()) {
+            return std::nullopt;
+        }
+
         return table_t::get_row(stmt);
     }
 

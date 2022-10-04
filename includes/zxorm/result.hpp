@@ -70,6 +70,10 @@ namespace zxorm {
             return *this;
         }
 
+        Error&& error () {
+            return std::move(std::get<Error>(_result));
+        }
+
         operator const T& () const {
             enforce_error_checked();
             return std::get<T>(_result);
@@ -95,5 +99,13 @@ namespace zxorm {
         OptionalResult(const std::nullopt_t) : __base_t{(std::optional<T>) std::nullopt} {}
         OptionalResult(T r) : __base_t{std::move(r)} {}
         OptionalResult(Error r) : __base_t{std::move(r)} {}
+
+        OptionalResult (Result<T>&& result): __base_t{std::nullopt} {
+            if (result.is_error()) {
+                __base_t::_result = result.error();
+            } else {
+                __base_t::_result = std::move(result.value());
+            }
+        }
     };
 };
