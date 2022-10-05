@@ -34,7 +34,7 @@ namespace zxorm {
                 auto err = _stmt->step();
                 if (err) {
                     _current = err.value();
-                } else {
+                } else if (!_stmt->done()) {
                     _current = Table::get_row(*_stmt);
                 }
                 return *this;

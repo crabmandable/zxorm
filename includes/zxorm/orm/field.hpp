@@ -9,15 +9,39 @@ namespace zxorm {
         static_assert(not std::is_same_v<column_t, std::false_type>,
                 "No such field belonging to table");
 
-        template <typename M>
+        template <ArithmeticT M>
         requires (std::is_convertible_v<M, typename column_t::member_t>)
         ColumnExpression<column_t, comparison_op_t::EQ, M> operator==(M value) {
             return value;
         }
 
-        template <typename M>
+        template <ArithmeticT M>
         requires (std::is_convertible_v<M, typename column_t::member_t>)
         ColumnExpression<column_t, comparison_op_t::NE, M> operator!=(M value) {
+            return value;
+        }
+
+        template <ArithmeticT M>
+        requires (std::is_convertible_v<M, typename column_t::member_t>)
+        ColumnExpression<column_t, comparison_op_t::LT, M> operator<(M value) {
+            return value;
+        }
+
+        template <ArithmeticT M>
+        requires (std::is_convertible_v<M, typename column_t::member_t>)
+        ColumnExpression<column_t, comparison_op_t::LTE, M> operator<=(M value) {
+            return value;
+        }
+
+        template <ArithmeticT M>
+        requires (std::is_convertible_v<M, typename column_t::member_t>)
+        ColumnExpression<column_t, comparison_op_t::GT, M> operator>(M value) {
+            return value;
+        }
+
+        template <ArithmeticT M>
+        requires (std::is_convertible_v<M, typename column_t::member_t>)
+        ColumnExpression<column_t, comparison_op_t::GTE, M> operator>=(M value) {
             return value;
         }
 

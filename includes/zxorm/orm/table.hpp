@@ -38,7 +38,7 @@ class Table {
         };
 
         template <FixedLengthString name>
-        requires (index_of_first<name == Column::name...>::value > 0)
+        requires (index_of_first<name == Column::name...>::value >= 0)
         struct column_by_name<name>
         {
             static constexpr int column_idx = index_of_first<name == Column::name...>::value;
@@ -131,14 +131,14 @@ class Table {
         static std::string where_query(const auto& expression) {
             std::ostringstream ss;
             ss << "SELECT * FROM `" << table_name.value << "` ";
-            ss << "WHERE " << expression;
+            ss << "WHERE " << expression << ";";
             return ss.str();
         }
 
         static Result<T> get_row(Statement& stmt)
         {
             if (stmt.column_count() != n_columns) {
-                return Error("Unexpected number of columns returned by find query,"
+                return Error("Unexpected number of columns returned by query,"
                         " tables may not be synced");
             }
 

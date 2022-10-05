@@ -97,6 +97,7 @@ namespace zxorm {
         template <ContinuousContainer T>
         [[nodiscard]] OptionalError bind(size_t idx, const T& param)
         {
+            assert(idx != 0);
             bool bound_null = false;
             int result;
 
