@@ -17,6 +17,7 @@ namespace zxorm {
         std::unique_ptr<sqlite3_stmt, std::function<void(sqlite3_stmt*)>> _stmt;
         size_t _parameter_count;
         std::map<size_t, bool> _is_bound;
+        std::map<size_t, std::vector<uint8_t>> _blob_bindings;
         int _column_count = 0;
         size_t _step_count = 0;
         bool _done = false;
@@ -109,9 +110,13 @@ namespace zxorm {
             }
 
             if (!bound_null) {
-                const auto param_to_bind = MetaContainer<const T>(param);
                 constexpr size_t el_size = sizeof(typename remove_optional<T>::type::value_type);
-                result = sqlite3_bind_blob(_stmt.get(), idx, param_to_bind.data(), param_to_bind.size() * el_size, nullptr);
+                const auto param_to_bind = MetaContainer<const T>(param);
+                auto len = param_to_bind.size() * el_size;
+                _blob_bindings[idx] = std::vector<uint8_t>();
+                _blob_bindings[idx].resize(len);
+                std::memcpy(_blob_bindings[idx].data(), param_to_bind.data(), len);
+                result = sqlite3_bind_blob(_stmt.get(), idx, _blob_bindings[idx].data(), _blob_bindings[idx].size(), nullptr);
             }
 
             if (result != SQLITE_OK) {

@@ -7,9 +7,9 @@ using namespace zxorm;
 
 struct Object {
     int id = 0;
-    int some_id = 0;
-    std::string some_text;
-    float some_float;
+    int some_id = 13;
+    std::string some_text = "heelllo";
+    float some_float = 11.0;
     bool some_bool = false;
     std::optional<float> some_optional;
     std::optional<std::vector<char>> some_optional_buffer;
@@ -414,12 +414,12 @@ TEST_F(QueryTest, WhereLike)
     ASSERT_FALSE(my_conn->insert_record(obj));
 
     auto result = my_conn->where<Object>(table_t::field<"text">.like(std::string("hello_")));
-
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
-
     auto iter = result.value();
+
     auto vec = iter.to_vector();
+    if (vec.is_error()) std::cout << vec.error() << std::endl;
     ASSERT_FALSE(vec.is_error());
     ASSERT_EQ(vec.value().size(), 4);
 }
@@ -467,7 +467,7 @@ TEST_F(QueryTest, WhereGlob)
     auto iter = result.value();
     auto vec = iter.to_vector();
     ASSERT_FALSE(vec.is_error());
-    ASSERT_EQ(vec.value().size(), 2);
+    ASSERT_EQ(vec.value().size(), 4);
 }
 
 TEST_F(QueryTest, WhereNotGlob)
@@ -492,5 +492,5 @@ TEST_F(QueryTest, WhereNotGlob)
     auto iter = result.value();
     auto vec = iter.to_vector();
     ASSERT_FALSE(vec.is_error());
-    ASSERT_EQ(vec.value().size(), 5);
+    ASSERT_EQ(vec.value().size(), 1);
 }
