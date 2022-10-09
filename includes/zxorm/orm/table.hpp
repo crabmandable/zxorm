@@ -56,6 +56,8 @@ class Table {
         template <FixedLengthString name>
         static inline Field<Table, name> field = Field<Table, name>();
 
+        static constexpr auto name = table_name.value;
+
         static std::string create_table_query(bool if_not_exist) {
             std::stringstream query;
             query << "CREATE TABLE ";
@@ -78,22 +80,6 @@ class Table {
             qstr.erase(qstr.end() - 2);
 
             return qstr + " );\n";
-        }
-
-        static std::string find_query() {
-            std::ostringstream ss;
-            ss << "SELECT * FROM `" << table_name.value << "` ";
-            ss << "WHERE `" << primary_key_t::name.value << "` = ?;";
-
-            return ss.str();
-        }
-
-        static std::string delete_query() {
-            std::ostringstream ss;
-            ss << "DELETE FROM `" << table_name.value << "` ";
-            ss << "WHERE `" << primary_key_t::name.value << "` = ?;";
-
-            return ss.str();
         }
 
         static std::string insert_query() {
@@ -126,13 +112,6 @@ class Table {
             }
 
             return str + ss2.str();
-        }
-
-        static std::string where_query(const auto& expression) {
-            std::ostringstream ss;
-            ss << "SELECT * FROM `" << table_name.value << "` ";
-            ss << "WHERE " << expression << ";";
-            return ss.str();
         }
 
         static Result<T> get_row(Statement& stmt)

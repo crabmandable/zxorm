@@ -41,6 +41,9 @@ namespace zxorm {
         public:
         [[nodiscard]] static Result<Statement> create(sqlite3* handle, Logger logger, const std::string& query)
         {
+            logger(log_level::Debug, "Initializing statement");
+            logger(log_level::Debug, query.c_str());
+
             sqlite3_stmt* stmt = nullptr;
             int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
@@ -50,10 +53,21 @@ namespace zxorm {
                 return Error("Unable to initialize statement", result);
             }
 
-            logger(log_level::Debug, "Initialized statement");
-            logger(log_level::Debug, query.c_str());
-
             return Statement(logger, stmt);
+        }
+
+        [[nodiscard]] OptionalError bind(auto tuple)
+        {
+            OptionalError err;
+            size_t i = 1;
+            std::apply([&](const auto&... binding) {
+                ([&]() {
+                    if (err) return;
+                    err = bind(i++, binding);
+                }(), ...);
+            }, tuple);
+
+            return err;
         }
 
         template <ArithmeticT T>

@@ -30,25 +30,23 @@ namespace zxorm {
     }
 
     enum class order_t {
-        NONE,
         ASC,
         DESC,
     };
 
-    static constexpr const char* order_str(order_t t) {
-        switch(t) {
-            case order_t::NONE: {
-                return "";
-            }
+    static inline std::ostream & operator<< (std::ostream &out, const order_t& type) {
+        switch(type) {
             case order_t::ASC: {
-                return "ASC";
+                out << "ASC";
+                break;
             }
             case order_t::DESC: {
-                return "DESC";
+                out << "DESC";
+                break;
             }
         }
 
-        return "OOPS";
+        return out;
     }
 
     template<typename T>

@@ -2,28 +2,23 @@
 
 * Deferrable Foreign keys
 
-* Expressions:
+* Constraints:
     * Check
     * Expression as default
-
-* Selects:
-    * Handle finding by multi-column primary key
-    * Where
 
 * Table constraints
 
 * Update
 
-* deleteWhere
+* delete where
 
 * Bulk insert
 
 * Relationships
 
-* Transactions
-
 * Tests:
     * Constraints
+    * Transactions
 
 * Statement caching
 

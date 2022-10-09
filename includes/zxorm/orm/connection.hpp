@@ -5,7 +5,11 @@
 #include "zxorm/error.hpp"
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
+#include "zxorm/orm/query_serializer.hpp"
+#include "zxorm/orm/expression.hpp"
 #include "zxorm/result.hpp"
+#include "zxorm/orm/field.hpp"
+#include "zxorm/orm/select.hpp"
 #include <functional>
 #include <sstream>
 #include <memory>
@@ -32,11 +36,14 @@ namespace zxorm {
         void log_error(const Error& err);
         inline void log_error(const OptionalError& err);
 
+        template<class T, class Expression>
+        auto make_select(const Expression& e);
+
+        template<class T>
+        auto make_select();
+
         auto make_statement(const std::string& query);
         auto exec(const std::string& query) -> OptionalError;
-
-        // TODO this should be public
-        OptionalError transaction(std::function<OptionalError()> run);
 
         // The conditional makes it impossible to deduce the type T apparently :(
         // so the public inserts call this implementation
@@ -55,6 +62,9 @@ namespace zxorm {
 
         OptionalError create_tables(bool if_not_exist = true);
         Result<size_t> count_tables();
+
+        // TODO needs tests
+        OptionalError transaction(std::function<OptionalError()> run);
 
         template<class T>
             OptionalError insert_record (const T& record)
@@ -76,7 +86,17 @@ namespace zxorm {
 
         template<class T, class Expression>
             [[nodiscard]] auto where(const Expression& e) ->
-                Result<RecordIterator<typename table_for_class<T>::type>>;
+                Select<typename table_for_class<T>::type, decltype(e.bindings())>;
+
+        template<class T>
+            [[nodiscard]] auto all() ->
+                Select<typename table_for_class<T>::type, std::tuple<>>;
+
+        template<class T>
+        [[nodiscard]] auto first();
+
+        template<class T>
+        [[nodiscard]] auto last();
     };
 
     template <class... Table>
@@ -144,6 +164,28 @@ namespace zxorm {
         using table_t = typename table_for_class<C>::type;
         if (!table_t::has_primary_key) return false;
         return table_t::primary_key_t::sql_column_type == sqlite_column_type::INTEGER;
+    }
+
+    template <class... Table>
+    template<class T, class Expression>
+    auto Connection<Table...>::make_select(const Expression& e)
+    {
+        return Select<T, decltype(e.bindings())>(
+            _db_handle.get(),
+            _logger,
+            e.serialize(),
+            e.bindings()
+        );
+    }
+
+    template <class... Table>
+    template<class T>
+    auto Connection<Table...>::make_select()
+    {
+        return Select<T, std::tuple<>>(
+            _db_handle.get(),
+            _logger
+        );
     }
 
     template <class... Table>
@@ -276,21 +318,14 @@ namespace zxorm {
 
         static_assert(table_t::has_primary_key, "Cannot execute a find on a table without a primary key");
 
-        static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::primary_key_t::member_t>,
+        using primary_key_t = typename table_t::primary_key_t;
+
+        static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
-        typename table_t::primary_key_t::member_t pk = id;
-        auto query = table_t::find_query();
-
-        ZXORM_GET_RESULT(Statement stmt, make_statement(query));
-        ZXORM_TRY(stmt.bind(1, pk));
-        ZXORM_TRY(stmt.step());
-
-        if (stmt.done()) {
-            return std::nullopt;
-        }
-
-        return table_t::get_row(stmt);
+        auto e = Field<table_t, primary_key_t::name>() == id;
+        return Select<table_t, decltype(e.bindings())>(
+                _db_handle.get(), _logger, e.serialize(), e.bindings()).one();
     }
 
     template <class... Table>
@@ -301,14 +336,18 @@ namespace zxorm {
 
         static_assert(table_t::has_primary_key, "Cannot execute a delete on a table without a primary key");
 
-        static_assert(std::is_convertible_v<PrimaryKeyType, typename table_t::primary_key_t::member_t>,
+        using primary_key_t = typename table_t::primary_key_t;
+
+        static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
-        typename table_t::primary_key_t::member_t pk = id;
-        auto query = table_t::delete_query();
+        auto where_expr = Field<table_t, primary_key_t::name>() == id;
+        auto query = QuerySerializer(query_type_t::DELETE, table_t::name).serialize([&](std::ostream& ss) {
+                ss << "WHERE " << where_expr;
+        });
 
         ZXORM_GET_RESULT(Statement stmt, make_statement(query));
-        ZXORM_TRY(stmt.bind(1, pk));
+        ZXORM_TRY(stmt.bind(where_expr.bindings()));
         ZXORM_TRY(stmt.step());
 
         return std::nullopt;
@@ -317,23 +356,35 @@ namespace zxorm {
     template <class... Table>
     template<class T, class Expression>
     auto Connection<Table...>::where(const Expression& e) ->
-        Result<RecordIterator<typename Connection<Table...>::table_for_class<T>::type>>
+        Select<typename table_for_class<T>::type, decltype(e.bindings())>
     {
         using table_t = typename table_for_class<T>::type;
-        auto query = table_t::where_query(e);
-        ZXORM_GET_RESULT(Statement stmt, make_statement(query));
+        return make_select<table_t>(e);
+    }
 
-        OptionalError err;
-        size_t i = 1;
-        std::apply([&](const auto&... binding) {
-            ([&]() {
-                if (err) return;
-                err = stmt.bind(i++, binding);
-            }(), ...);
-        }, e.bindings());
+    template <class... Table>
+    template<class T>
+    auto Connection<Table...>::all() ->
+        Select<typename table_for_class<T>::type, std::tuple<>>
+    {
+        using table_t = typename table_for_class<T>::type;
+        return make_select<table_t>();
+    }
 
-        if (err) return err.value();
+    template <class... Table>
+    template<class T>
+    auto Connection<Table...>::first()
+    {
+        using table_t = typename table_for_class<T>::type;
+        return make_select<table_t>().one();
+    }
 
-        return RecordIterator<table_t>(std::move(stmt));
+    template <class... Table>
+    template<class T>
+    auto Connection<Table...>::last()
+    {
+        using table_t = typename table_for_class<T>::type;
+        constexpr auto pk_name = table_t::primary_key_t::name;
+        return make_select<table_t>().template order_by<pk_name>(order_t::DESC).one();
     }
 };

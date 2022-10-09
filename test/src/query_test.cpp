@@ -189,7 +189,7 @@ TEST_F(QueryTest, WhereEq)
 
     auto err = my_conn->insert_record(obj);
     ASSERT_FALSE(err);
-    auto result = my_conn->where<Object>(table_t::field<"some_id"> == 42);
+    auto result = my_conn->where<Object>(table_t::field<"some_id"> == 42).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
@@ -226,7 +226,7 @@ TEST_F(QueryTest, WhereEq)
 
 TEST_F(QueryTest, WhereFindNothing)
 {
-    auto result = my_conn->where<Object>(table_t::field<"some_id"> == 42);
+    auto result = my_conn->where<Object>(table_t::field<"some_id"> == 42).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
@@ -246,7 +246,7 @@ TEST_F(QueryTest, WhereFindMany)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->where<Object>(table_t::field<"some_id"> == 42);
+    auto result = my_conn->where<Object>(table_t::field<"some_id"> == 42).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
@@ -268,7 +268,7 @@ TEST_F(QueryTest, WhereEqOrEq)
     auto result = my_conn->where<Object>(
             table_t::field<"some_id"> == 0 ||
             table_t::field<"some_id"> == 1 ||
-            table_t::field<"some_id"> == 2);
+            table_t::field<"some_id"> == 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -288,7 +288,7 @@ TEST_F(QueryTest, WhereNe)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->where<Object>(table_t::field<"some_id"> != 0);
+    auto result = my_conn->where<Object>(table_t::field<"some_id"> != 0).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -310,7 +310,7 @@ TEST_F(QueryTest, WhereNeAndNe)
 
     auto result = my_conn->where<Object>(
             table_t::field<"some_id"> != 0 &&
-            table_t::field<"id"> != 2);
+            table_t::field<"id"> != 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -330,7 +330,7 @@ TEST_F(QueryTest, WhereLt)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->where<Object>(table_t::field<"id"> < 2);
+    auto result = my_conn->where<Object>(table_t::field<"id"> < 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -350,7 +350,7 @@ TEST_F(QueryTest, WhereLte)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->where<Object>(table_t::field<"id"> <= 2);
+    auto result = my_conn->where<Object>(table_t::field<"id"> <= 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -370,7 +370,7 @@ TEST_F(QueryTest, WhereGt)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->where<Object>(table_t::field<"id"> > 2);
+    auto result = my_conn->where<Object>(table_t::field<"id"> > 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -390,7 +390,7 @@ TEST_F(QueryTest, WhereGte)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->where<Object>(table_t::field<"id"> >= 2);
+    auto result = my_conn->where<Object>(table_t::field<"id"> >= 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -413,7 +413,7 @@ TEST_F(QueryTest, WhereLike)
     obj.some_text = std::string("helllo4");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->where<Object>(table_t::field<"text">.like(std::string("hello_")));
+    auto result = my_conn->where<Object>(table_t::field<"text">.like(std::string("hello_"))).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
     auto iter = result.value();
@@ -436,7 +436,7 @@ TEST_F(QueryTest, WhereNotLike)
     obj.some_text = std::string("helllo4");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->where<Object>(table_t::field<"text">.not_like("hello_"));
+    auto result = my_conn->where<Object>(table_t::field<"text">.not_like("hello_")).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -459,7 +459,7 @@ TEST_F(QueryTest, WhereGlob)
     obj.some_text = std::string("helllo4");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->where<Object>(table_t::field<"text">.glob("hello*"));
+    auto result = my_conn->where<Object>(table_t::field<"text">.glob("hello*")).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -484,7 +484,7 @@ TEST_F(QueryTest, WhereNotGlob)
     obj.some_text = std::string("h5");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->where<Object>(table_t::field<"text">.not_glob("hell*"));
+    auto result = my_conn->where<Object>(table_t::field<"text">.not_glob("hell*")).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -493,4 +493,183 @@ TEST_F(QueryTest, WhereNotGlob)
     auto vec = iter.to_vector();
     ASSERT_FALSE(vec.is_error());
     ASSERT_EQ(vec.value().size(), 1);
+}
+
+TEST_F(QueryTest, All)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->all<Object>().many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 6);
+}
+
+TEST_F(QueryTest, OrderDesc)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->all<Object>().order_by<"id">(order_t::DESC).many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 6);
+    ASSERT_EQ(vec.value()[0].id, 6);
+    ASSERT_EQ(vec.value()[1].id, 5);
+    ASSERT_EQ(vec.value()[2].id, 4);
+    ASSERT_EQ(vec.value()[3].id, 3);
+    ASSERT_EQ(vec.value()[4].id, 2);
+    ASSERT_EQ(vec.value()[5].id, 1);
+}
+
+TEST_F(QueryTest, OrderAscOne)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->all<Object>().order_by<"id">(order_t::ASC).one();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto found = result.value();
+    ASSERT_TRUE(found.has_value());
+    ASSERT_EQ(found.value().id, 1);
+}
+
+TEST_F(QueryTest, OrderAscLimit)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->all<Object>().order_by<"id">(order_t::DESC).limit(3).many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 3);
+    ASSERT_EQ(vec.value()[0].id, 6);
+    ASSERT_EQ(vec.value()[1].id, 5);
+    ASSERT_EQ(vec.value()[2].id, 4);
+}
+
+TEST_F(QueryTest, EmptyOne)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->where<Object>(table_t::field<"id"> > 10).one();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto found = result.value();
+    ASSERT_FALSE(found.has_value());
+}
+
+TEST_F(QueryTest, First)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->first<Object>();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto found = result.value();
+    ASSERT_TRUE(found.has_value());
+    ASSERT_EQ(found.value().id, 1);
+}
+
+TEST_F(QueryTest, Last)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->last<Object>();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto found = result.value();
+    ASSERT_TRUE(found.has_value());
+    ASSERT_EQ(found.value().id, 6);
 }
