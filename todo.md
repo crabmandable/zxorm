@@ -1,10 +1,10 @@
 Note to self: start from top
 
-* Update
-
 * delete where
 
 * Bulk insert
+
+* Bulk update
 
 * Relationships
 

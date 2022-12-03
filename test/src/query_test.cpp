@@ -670,3 +670,25 @@ TEST_F(QueryTest, Last)
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(result.value().id, 6);
 }
+
+TEST_F(QueryTest, UpdateSomething)
+{
+    Object obj;
+
+    obj.some_text = "Some text";
+    obj.some_float = 3.14;
+    obj.some_id = 42;
+    obj.some_bool = true;
+
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    obj.some_text = "Some different text";
+    err = my_conn->update_record(obj);
+    ASSERT_FALSE(err);
+
+    auto result = my_conn->find_record<Object>(obj.id);
+    ASSERT_FALSE(result.is_error());
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().some_text, std::string("Some different text"));
+}

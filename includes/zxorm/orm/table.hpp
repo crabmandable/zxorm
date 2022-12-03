@@ -114,6 +114,25 @@ class Table {
             return str + ss2.str();
         }
 
+        static std::string update_query() {
+            std::ostringstream ss;
+            ss << "UPDATE `" << table_name.value << "` SET ";
+
+            std::apply([&](const auto&... a) {
+                ([&]() {
+                    using column_t = std::remove_reference_t<decltype(a)>;
+                    if constexpr (not column_t::is_primary_key) {
+                        ss << "`" << column_t::name.value << "` = ?, ";
+                    }
+                }(), ...);
+            }, columns_t{});
+
+            std::string str = ss.str();
+            str.erase(str.end() - 2, str.end());
+
+            return str + " WHERE `" + primary_key_t::name.value + "` = ?;";
+        }
+
         static Result<T> get_row(Statement& stmt)
         {
             if (stmt.column_count() != n_columns) {

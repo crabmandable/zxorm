@@ -67,6 +67,9 @@ namespace zxorm {
         OptionalError transaction(std::function<OptionalError()> run);
 
         template<class T>
+            OptionalError update_record (const T& record);
+
+        template<class T>
             OptionalError insert_record (const T& record)
             { return insert_record_impl<T>(record); }
 
@@ -233,6 +236,53 @@ namespace zxorm {
 
         return exec("COMMIT TRANSACTION;");
     };
+
+    template <class... Table>
+    template<class T>
+    OptionalError Connection<Table...>::update_record (const T& record)
+    {
+        using table_t = typename table_for_class<T>::type;
+        static_assert(table_t::has_primary_key, "Cannot execute an update on a table without a primary key");
+
+        auto& pk = table_t::primary_key_t::getter(record);
+
+        if constexpr (table_has_rowid<T>()) {
+            if (!pk) {
+                return Error("Cannot update record with unknown rowid");
+            }
+        }
+
+        auto query = table_t::update_query();
+        ZXORM_GET_RESULT(Statement update_stmt, make_statement(query));
+
+        int i = 1;
+        OptionalError err;
+        std::apply([&](const auto&... a) {
+            ([&]() {
+                if (err) return;
+                using column_t = std::remove_reference_t<decltype(a)>;
+
+                if constexpr (not column_t::is_primary_key) {
+                    auto& val = column_t::getter(record);
+                    err = update_stmt.bind(i++, val);
+                }
+
+            }(), ...);
+        }, typename table_t::columns_t{});
+
+        if (err) {
+            return err;
+        }
+
+        ZXORM_TRY(update_stmt.bind(i++, pk));
+        ZXORM_TRY(update_stmt.step());
+
+        if (!update_stmt.done()) {
+            return Error("Update query didn't run to completion");
+        }
+
+        return std::nullopt;
+    }
 
     template <class... Table>
     template<class T>

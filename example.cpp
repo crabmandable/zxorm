@@ -60,8 +60,13 @@ int main (void) {
     newStudent.name = "zach";
     connection.insert_record(newStudent);
 
+    // find a record by its primary key
     auto zach = connection.find_record<Student>(newStudent.id);
-    if (!zach.is_error() && zach.has_value()) {
-        zach.value().gpa = 3.14;
+    if (zach.is_error() || !zach.has_value()) {
+        throw std::runtime_error("Couldn't find zach");
     }
+
+    // update a record
+    zach.value().gpa = 3.14;
+    connection.update_record(zach.value());
 }
