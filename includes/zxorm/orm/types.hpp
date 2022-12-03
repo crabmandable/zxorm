@@ -63,6 +63,10 @@ namespace zxorm {
                 return sqlite_column_type::TEXT;
             } else if constexpr (ignore_qualifiers::is_continuous_container<T>()) {
                 return sqlite_column_type::BLOB;
+            } else if constexpr (std::is_convertible_v<T, sqlite3_int64>) {
+                return sqlite_column_type::INTEGER;
+            } else if constexpr (std::is_convertible_v<T, double>) {
+                return sqlite_column_type::REAL;
             } else {
                 static_assert(std::is_same_v<T, std::false_type>,
                     "Member type is not convertable to an sql type. "

@@ -135,7 +135,7 @@ namespace zxorm {
     concept ContinuousContainer = ignore_qualifiers::is_continuous_container<T>();
 
     template<typename T>
-    concept ArithmeticT = ignore_qualifiers::is_arithmetic<T>();
+    concept ArithmeticT = ignore_qualifiers::is_arithmetic<T>() || std::is_convertible_v<T, int> || std::is_convertible_v<T, float>;
 
     template<typename T>
     concept OptionalT = ignore_qualifiers::is_optional<T>();

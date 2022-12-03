@@ -227,14 +227,14 @@ namespace zxorm {
             switch(data_type) {
                 case SQLITE_INTEGER: {
                     if (sizeof(out_param) <= 4) {
-                        out_param = sqlite3_column_int(_stmt.get(), idx);
+                        out_param = static_cast<T>(sqlite3_column_int(_stmt.get(), idx));
                     } else {
-                        out_param = sqlite3_column_int64(_stmt.get(), idx);
+                        out_param = static_cast<T>(sqlite3_column_int64(_stmt.get(), idx));
                     }
                     break;
                 }
                 case SQLITE_FLOAT: {
-                    out_param = sqlite3_column_double(_stmt.get(), idx);
+                    out_param = static_cast<T>(sqlite3_column_double(_stmt.get(), idx));
                     break;
                 }
                 case SQLITE_TEXT:
@@ -252,7 +252,7 @@ namespace zxorm {
                     if constexpr (ignore_qualifiers::is_optional<T>()) {
                         out_param = std::nullopt;
                     } else {
-                        out_param = 0;
+                        out_param = static_cast<T>(0);
                     }
                     break;
                 }
