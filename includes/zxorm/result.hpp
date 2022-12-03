@@ -107,5 +107,17 @@ namespace zxorm {
                 __base_t::_result = std::move(result.value());
             }
         }
+
+        bool has_value() {
+            return not __base_t::is_error() && __base_t::value().has_value();
+        }
+
+        const T& value() const {
+            return __base_t::value().value();
+        }
+
+        T&& value() {
+            return __base_t::value().value();
+        }
     };
 };

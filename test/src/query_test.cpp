@@ -145,19 +145,18 @@ TEST_F(QueryTest, FindSomethingWithOptionalsFilled)
     if (result.is_error()) {
         std::cout << std::string(result.error()) << std::endl;
         ASSERT_FALSE(true);
-    } else {
-        auto record = result.value();
-        ASSERT_TRUE(record);
-        ASSERT_EQ(record.value().id, 1);
-        ASSERT_EQ(record.value().some_text, "Some text");
-        ASSERT_FLOAT_EQ(record.value().some_float, 3.14);
-        ASSERT_FALSE(record.value().some_bool);
-        ASSERT_EQ(record.value().some_id, 42);
-        ASSERT_TRUE(record.value().some_optional.has_value());
-        ASSERT_FLOAT_EQ(record.value().some_optional.value(), 42.333);
-        auto expectedBuff = std::vector<char> {'y', 'o'};
-        ASSERT_EQ(record.value().some_optional_buffer.value(), expectedBuff);
     }
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().id, 1);
+    ASSERT_EQ(result.value().some_text, "Some text");
+    ASSERT_FLOAT_EQ(result.value().some_float, 3.14);
+    ASSERT_FALSE(result.value().some_bool);
+    ASSERT_EQ(result.value().some_id, 42);
+    ASSERT_TRUE(result.value().some_optional.has_value());
+    ASSERT_FLOAT_EQ(result.value().some_optional.value(), 42.333);
+    auto expectedBuff = std::vector<char> {'y', 'o'};
+    ASSERT_EQ(result.value().some_optional_buffer.value(), expectedBuff);
 }
 
 TEST_F(QueryTest, DeleteSomething)
@@ -175,7 +174,7 @@ TEST_F(QueryTest, DeleteSomething)
     ASSERT_FALSE(err);
     auto result = my_conn->find_record<Object>(1);
     ASSERT_FALSE(result.is_error());
-    ASSERT_FALSE(result.value());
+    ASSERT_FALSE(result.has_value());
 }
 
 TEST_F(QueryTest, WhereEq)
@@ -570,9 +569,8 @@ TEST_F(QueryTest, OrderAscOne)
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
-    auto found = result.value();
-    ASSERT_TRUE(found.has_value());
-    ASSERT_EQ(found.value().id, 1);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().id, 1);
 }
 
 TEST_F(QueryTest, OrderAscLimit)
@@ -589,7 +587,10 @@ TEST_F(QueryTest, OrderAscLimit)
     obj.some_text = std::string("h5");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->all<Object>().order_by<"id">(order_t::DESC).limit(3).many();
+    auto result = my_conn->all<Object>()
+        .order_by<"id">(order_t::DESC)
+        .limit(3)
+        .many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -621,9 +622,7 @@ TEST_F(QueryTest, EmptyOne)
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
-
-    auto found = result.value();
-    ASSERT_FALSE(found.has_value());
+    ASSERT_FALSE(result.has_value());
 }
 
 TEST_F(QueryTest, First)
@@ -645,9 +644,8 @@ TEST_F(QueryTest, First)
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
-    auto found = result.value();
-    ASSERT_TRUE(found.has_value());
-    ASSERT_EQ(found.value().id, 1);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().id, 1);
 }
 
 TEST_F(QueryTest, Last)
@@ -669,7 +667,6 @@ TEST_F(QueryTest, Last)
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
-    auto found = result.value();
-    ASSERT_TRUE(found.has_value());
-    ASSERT_EQ(found.value().id, 6);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value().id, 6);
 }
