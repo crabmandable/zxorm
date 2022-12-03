@@ -1,3 +1,13 @@
+Note to self: start from top
+
+* Update
+
+* delete where
+
+* Bulk insert
+
+* Relationships
+
 * Cleanup template errors
 
 * Deferrable Foreign keys
@@ -7,14 +17,6 @@
     * Expression as default
 
 * Table constraints
-
-* Update
-
-* delete where
-
-* Bulk insert
-
-* Relationships
 
 * Tests:
     * Constraints
