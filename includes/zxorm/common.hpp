@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <iterator>
+#include <optional>
 
 namespace zxorm {
     enum class log_level {

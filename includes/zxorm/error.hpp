@@ -1,5 +1,6 @@
 #pragma once
 #include "zxorm/common.hpp"
+#include <cassert>
 
 #define ZXORM_TRY(expression)                    \
     {                                            \
@@ -30,7 +31,7 @@ namespace zxorm {
         }
     };
 
-    struct [[nodiscard]] OptionalError {
+    struct OptionalError {
     private:
         std::optional<Error> _err;
 
@@ -86,7 +87,7 @@ namespace zxorm {
         }
 
         ~OptionalError() {
-#ifndef NDEBUG
+#if !defined(NDEBUG) && defined(ZXORM_FORCE_ERR_CHECK)
             assert(_err_was_checked);
 #endif
         }

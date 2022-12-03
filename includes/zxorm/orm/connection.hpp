@@ -48,7 +48,7 @@ namespace zxorm {
         // The conditional makes it impossible to deduce the type T apparently :(
         // so the public inserts call this implementation
         template<class T>
-            OptionalError insert_record_impl (
+            [[nodiscard]] OptionalError insert_record_impl (
                     std::conditional_t<table_has_rowid<T>(), T&, const T&> record);
 
     public:
