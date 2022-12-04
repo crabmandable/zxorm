@@ -32,6 +32,7 @@ using StudentTable = Table<"students", Student,
     Column<"gpa", &Student::gpa>
         >;
 
+
 int main (void) {
     auto maybe_connection = Connection<StudentTable>::create("school.db");
 
@@ -61,12 +62,37 @@ int main (void) {
     connection.insert_record(newStudent);
 
     // find a record by its primary key
-    auto zach = connection.find_record<Student>(newStudent.id);
+    auto found = connection.find_record<Student>(newStudent.id);
+    if (found.is_error() || !found.has_value()) {
+        throw std::runtime_error("Couldn't find new student");
+    }
+
+    // update a record
+    found.value().gpa = 3.14;
+    connection.update_record(found.value());
+
+    // find a record by some other column
+    auto zach = connection.where<Student>(StudentTable::field<"name">.like("zach")).one();
     if (zach.is_error() || !zach.has_value()) {
         throw std::runtime_error("Couldn't find zach");
     }
 
-    // update a record
-    zach.value().gpa = 3.14;
-    connection.update_record(zach.value());
+    connection.insert_many_records(std::vector<Student> {
+        { .year = Student::Year::Freshman, .name = "jojo", .gpa = 3.44 },
+        { .year = Student::Year::Sophmore, .name = "janet", .gpa = 2.4 },
+        { .year = Student::Year::Sophmore, .name = "bob", .gpa = 3.9 },
+        { .year = Student::Year::Senior, .name = "billie", .gpa = 3.95 },
+        { .year = Student::Year::Senior, .name = "wayne", .gpa = 2.98 },
+    });
+
+    // find many records with a more complicated WHERE clause
+    auto students = connection.where<Student>(
+        StudentTable::field<"gpa"> >= 3.0 &&
+        StudentTable::field<"year"> > Student::Year::Freshman
+    ).many();
+
+    std::cout << "passing students:\n";
+    for (const Result<Student>& student: students.value()) {
+        std::cout << "\t" << student.value().name << "\n";
+    }
 }

@@ -82,7 +82,7 @@ class Table {
             return qstr + " );\n";
         }
 
-        static std::string insert_query() {
+        static std::string insert_query(size_t n_rows = 1) {
             std::ostringstream ss;
             ss << "INSERT INTO `" << table_name.value << "` (";
 
@@ -102,16 +102,27 @@ class Table {
             str.erase(str.end() - 2, str.end());
 
             std::ostringstream ss2;
-            ss2 << ") VALUES (";
-            for (size_t i = 0; i < n_query_columns; i++) {
-                if (i == n_query_columns - 1) {
-                    ss2 << "?);";
-                } else  {
-                    ss2 << "?, ";
+            ss2 << ") VALUES ";
+
+            for (size_t i = 0; i < n_rows; i++) {
+                std::ostringstream val;
+                val << "(";
+                for (size_t i = 0; i < n_query_columns; i++) {
+                    if (i == n_query_columns - 1) {
+                        val << "?), ";
+                    } else  {
+                        val << "?, ";
+                    }
                 }
+
+                auto v = val.str();
+                if (i == n_rows - 1) {
+                    v.erase(v.end() - 2, v.end());
+                }
+                ss2 << v;
             }
 
-            return str + ss2.str();
+            return str + ss2.str() + ";";
         }
 
         static std::string update_query() {

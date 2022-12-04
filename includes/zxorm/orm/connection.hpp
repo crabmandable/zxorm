@@ -81,6 +81,19 @@ namespace zxorm {
             OptionalError insert_record (T& record)
             { return insert_record_impl<T>(record); }
 
+        // matches stl containers, allowing template arg deduction
+        template<template<typename, typename> typename Container, typename T, typename Allocator>
+            OptionalError insert_many_records (const Container<T, Allocator>& records, size_t batch_size = 10)
+            { return insert_many_records<T>(records, batch_size); }
+
+        // matches std::array, allowing template arg deduction
+        template<template<typename, auto> typename Container, typename T, auto size>
+            OptionalError insert_many_records (const Container<T, size>& records, size_t batch_size = 10)
+            { return insert_many_records<T>(records, batch_size); }
+
+        template<typename T, IndexableContainer<T> Container>
+            OptionalError insert_many_records (const Container& records, size_t batch_size = 10);
+
         template<class T, typename PrimaryKeyType>
             [[nodiscard]] OptionalResult<T> find_record(const PrimaryKeyType& id);
 
@@ -282,6 +295,73 @@ namespace zxorm {
         }
 
         return std::nullopt;
+    }
+
+    template <class... Table>
+    template<typename T, IndexableContainer<T> Container>
+    OptionalError Connection<Table...>::insert_many_records (const Container& records, size_t batch_size)
+    {
+        using table_t = typename table_for_class<T>::type;
+        return transaction([&]() -> OptionalError {
+            size_t inserted = 0;
+            // this error should always be overwritten
+            Result<Statement> insert_stmt = Error("Uninitialized statement");
+
+            while (inserted < records.size()) {
+                // iteration is less than batch size, query needs to be [re-]initialized
+                if (records.size() - inserted < batch_size) {
+                    batch_size = records.size() - inserted;
+                    auto query = table_t::insert_query(batch_size);
+                    insert_stmt = make_statement(query);
+                    if (insert_stmt.is_error()) {
+                        return insert_stmt.error();
+                    }
+                }
+                // first itertion, initiaize statment
+                else if (inserted == 0) {
+                    auto query = table_t::insert_query(batch_size);
+                    insert_stmt = make_statement(query);
+                    if (insert_stmt.is_error()) {
+                        return insert_stmt.error();
+                    }
+                // subsequent iterations just reset the same query
+                } else {
+                    ZXORM_TRY(insert_stmt.value().reset());
+                }
+
+
+                int i = 1;
+                for (size_t row = 0; row < batch_size; row++) {
+                    OptionalError err;
+                    std::apply([&](const auto&... a) {
+                        ([&]() {
+                            if (err) return;
+                            using column_t = std::remove_reference_t<decltype(a)>;
+
+                            if constexpr (!column_t::is_auto_inc_column) {
+                                const auto& val = column_t::getter(records[row + inserted]);
+                                err = insert_stmt.value().bind(i++, val);
+                            }
+
+                        }(), ...);
+                    }, typename table_t::columns_t{});
+
+                    if (err) {
+                        return err;
+                    }
+                }
+
+                ZXORM_TRY(insert_stmt.value().step());
+
+                if (!insert_stmt.value().done()) {
+                    return Error("Insert query didn't run to completion");
+                }
+
+                inserted += batch_size;
+            }
+
+            return std::nullopt;
+        });
     }
 
     template <class... Table>

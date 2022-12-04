@@ -26,7 +26,7 @@ namespace zxorm {
         }
 
         void enforce_error_checked() const {
-#ifndef NDEBUG
+#if !defined(NDEBUG) && defined(ZXORM_FORCE_ERR_CHECK)
             assert(_err_was_checked);
 #endif
         }

@@ -692,3 +692,31 @@ TEST_F(QueryTest, UpdateSomething)
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(result.value().some_text, std::string("Some different text"));
 }
+
+TEST_F(QueryTest, InsertMany)
+{
+    std::vector<Object> objects;
+    for (int i = 0; i < 200; i++) {
+        objects.push_back({
+            .some_id = i,
+            .some_text = "this is some text" + std::to_string(i),
+            .some_float = float(3.14 * i),
+            .some_bool = true,
+            .some_optional = float(i),
+            .some_optional_buffer = std::vector<char> {(char)i, 'b'}
+        });
+    }
+
+    auto err = my_conn->insert_many_records(objects);
+
+    ASSERT_FALSE(err);
+
+    auto result = my_conn->all<Object>().many();
+    ASSERT_FALSE(result.is_error());
+    auto inserted = result.value().to_vector();
+    ASSERT_FALSE(inserted.is_error());
+    ASSERT_EQ(200, inserted.value().size());
+    for (int i = 0; i < 200; i++) {
+        ASSERT_EQ(i, inserted.value()[i].some_id);
+    }
+}

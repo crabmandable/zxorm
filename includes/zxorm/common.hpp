@@ -131,6 +131,11 @@ namespace zxorm {
         }
     };
 
+    template<typename Container, typename T>
+    concept IndexableContainer = requires(const Container& c) {
+        {c[0]} -> std::same_as<const T&>;
+    };
+
     template<typename T>
     concept ContinuousContainer = ignore_qualifiers::is_continuous_container<T>();
 
