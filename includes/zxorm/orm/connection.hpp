@@ -117,6 +117,9 @@ namespace zxorm {
 
         template<class T>
         [[nodiscard]] auto last();
+
+        template<class T>
+        OptionalError truncate();
     };
 
     template <class... Table>
@@ -520,5 +523,19 @@ namespace zxorm {
         using table_t = typename table_for_class<T>::type;
         constexpr auto pk_name = table_t::primary_key_t::name;
         return make_select<table_t>().template order_by<pk_name>(order_t::DESC).one();
+    }
+
+    template <class... Table>
+    template<class T>
+    OptionalError Connection<Table...>::truncate()
+    {
+        using table_t = typename table_for_class<T>::type;
+
+        ZXORM_GET_RESULT(
+            auto stmt,
+            make_statement(std::string("DELETE FROM `") + table_t::name + "`;")
+        );
+
+        return stmt.step();
     }
 };
