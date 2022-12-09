@@ -10,6 +10,7 @@
 #include "zxorm/result.hpp"
 #include "zxorm/orm/field.hpp"
 #include "zxorm/orm/select.hpp"
+#include "zxorm/orm/delete.hpp"
 #include <functional>
 #include <sstream>
 #include <memory>
@@ -103,6 +104,9 @@ namespace zxorm {
         template<class T, class Expression>
             [[nodiscard]] auto where(const Expression& e) ->
                 Select<typename table_for_class<T>::type, decltype(e.bindings())>;
+
+        template<class T, class Expression>
+            OptionalError delete_where(const Expression& e);
 
         template<class T>
             [[nodiscard]] auto all() ->
@@ -471,16 +475,16 @@ namespace zxorm {
         static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
-        auto where_expr = Field<table_t, primary_key_t::name>() == id;
-        auto query = QuerySerializer(query_type_t::DELETE, table_t::name).serialize([&](std::ostream& ss) {
-                ss << "WHERE " << where_expr;
-        });
+        return delete_where<T>(Field<table_t, primary_key_t::name>() == id);
+    }
 
-        ZXORM_GET_RESULT(Statement stmt, make_statement(query));
-        ZXORM_TRY(stmt.bind(where_expr.bindings()));
-        ZXORM_TRY(stmt.step());
-
-        return std::nullopt;
+    template <class... Table>
+    template<class T, class Expression>
+    OptionalError Connection<Table...>::delete_where(const Expression& e)
+    {
+        using table_t = typename table_for_class<T>::type;
+        return Delete<table_t, decltype(e.bindings())>(
+            _db_handle.get(), _logger, e.serialize(), e.bindings()).exec();
     }
 
     template <class... Table>

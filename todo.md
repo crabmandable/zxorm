@@ -1,8 +1,6 @@
 Note to self: start from top
 
-* delete where
-
-* Bulk insert
+* REGEXP
 
 * Bulk update
 
@@ -23,8 +21,6 @@ Note to self: start from top
     * Transactions
 
 * Statement caching
-
-* REGEXP
 
 FIX:
     duplicate column class
