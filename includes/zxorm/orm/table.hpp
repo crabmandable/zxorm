@@ -53,6 +53,18 @@ class Table {
         using object_class = T;
         using columns_t = std::tuple<Column...>;
 
+        using foreign_keys_t = decltype(flatten_tuple(remove_from_tuple<std::tuple<>, typename Column::foreign_keys_t...>{}));
+
+        static void print_foriegn_keys() {
+            std::apply([&](const auto&... a) {
+                ([&]() {
+                    using fk_t = std::remove_reference_t<decltype(a)>;
+                    std::cout << "table: " << fk_t::reference_t::table_name.value
+                        << ", column: " << fk_t::reference_t::column_name.value << std::endl;
+                }(), ...);
+            }, foreign_keys_t{});
+        }
+
         template <FixedLengthString name>
         static inline Field<Table, name> field = Field<Table, name>();
 

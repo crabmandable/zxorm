@@ -58,23 +58,27 @@ namespace zxorm {
         }
     }
 
-    template<FixedLengthString table_name, FixedLengthString... column>
+    template<FixedLengthString _table_name, FixedLengthString _column_name>
         struct Reference {
+            static constexpr auto table_name = _table_name;
+            static constexpr auto column_name = _column_name;
+
             static std::string to_string() {
                 std::ostringstream ss;
-                ss << "REFERENCES `" << table_name.value << "` (`";
+                ss << "REFERENCES `" << table_name.value << "` "
+                    << "(`" << column_name.value << "`)";
 
-                ss << append_to_stream<"`, `", column...>();
-
-                std::string str = ss.str();
-                str.erase(str.end() - 3, str.end());
-                return str + ")";
+                return ss.str();
             }
         };
 
+    struct IsForeignKeyTrait {};
+
     // TODO support defferrable
     template<typename Reference, action_t on_update=action_t::no_action, action_t on_delete=action_t::no_action>
-    struct ForeignKey {
+    struct ForeignKey : IsForeignKeyTrait {
+        using reference_t = Reference;
+
         static std::string to_string() {
             std::ostringstream ss;
             ss << Reference::to_string()

@@ -9,15 +9,21 @@ namespace zxorm {
 
     namespace __constraint_t_detail {
         template <typename MemberT, typename... C>
-        struct constraints_t {
+        struct constraints {
             using type = unique_tuple<C...>;
         };
 
         template <typename MemberT, typename... C>
         requires (not ignore_qualifiers::is_optional<MemberT>())
-        struct constraints_t<MemberT, C...> {
+        struct constraints<MemberT, C...> {
             using type = unique_tuple<NotNull<>, C...>;
         };
+
+        template <typename Constraint>
+        using fk_or_false = typename std::conditional_t<std::is_base_of_v<IsForeignKeyTrait, Constraint>, Constraint, std::false_type>;
+
+        template <typename... Constraint>
+        using foreign_keys_t = remove_from_tuple<std::false_type, fk_or_false<Constraint>...>;
 
         static inline std::string constraint_creation_query(auto constraints) {
             std::stringstream ss;
@@ -63,7 +69,9 @@ namespace zxorm {
         using member_t = typename find_column_traits<decltype(M)>::type;
         static_assert(!std::is_same<member_t, std::false_type>::value, "Column template argument should be a pointer to a class member");
         using object_class = typename find_column_traits<decltype(M)>::klass;
-        using constraints_t = typename __constraint_t_detail::constraints_t<member_t, Constraint...>::type;
+        using constraints_t = typename __constraint_t_detail::constraints<member_t, Constraint...>::type;
+
+        using foreign_keys_t = typename __constraint_t_detail::foreign_keys_t<Constraint...>;
 
         static constexpr sqlite_column_type sql_column_type = member_to_sql_type<member_t>::value;
 
@@ -140,7 +148,9 @@ namespace zxorm {
         static constexpr sqlite_column_type sql_column_type = member_to_sql_type<member_t>::value;
         using object_class = typename setter_traits::klass;
 
-        using constraints_t = typename __constraint_t_detail::constraints_t<member_t, Constraint...>::type;
+        using constraints_t = typename __constraint_t_detail::constraints<member_t, Constraint...>::type;
+        using foreign_keys_t = typename __constraint_t_detail::foreign_keys_t<Constraint...>;
+
         static constexpr bool is_primary_key = any_of<constraint_is_primary_key<Constraint>::value...>;
         static constexpr bool is_auto_inc_column = any_of<constraint_is_primary_key<Constraint>::value...> && sql_column_type == sqlite_column_type::INTEGER;
 

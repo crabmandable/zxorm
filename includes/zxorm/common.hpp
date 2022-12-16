@@ -159,4 +159,56 @@ namespace zxorm {
 
     template <typename... Ts>
     using unique_tuple = typename __unique_tuple_detail::unique<std::tuple<>, Ts...>::type;
+
+    namespace __remove_from_tuple_detail {
+        template <typename X, typename T, typename... Ts>
+        struct remove : std::type_identity<T> {};
+
+        template <typename X, typename... Ts, typename U, typename... Us>
+        struct remove<X, std::tuple<Ts...>, U, Us...>
+            : std::conditional_t<std::is_same_v<X, U>,
+                                remove<X, std::tuple<Ts...>, Us...>,
+                                remove<X, std::tuple<Ts..., U>, Us...>> {};
+    };
+
+    template <typename X, typename... Ts>
+    using remove_from_tuple = typename __remove_from_tuple_detail::remove<X, std::tuple<>, Ts...>::type;
+
+    template <typename T> struct is_tuple : std::false_type{};
+    template <typename... Ts> struct is_tuple<std::tuple<Ts...>> : std::true_type{};
+
+    namespace __flatten_tuple_detail {
+        // utility to ensure return type is a tuple
+        template<typename T>
+            constexpr decltype(auto) as_tuple(T t) { return std::make_tuple(t); }
+
+        template<typename ...Ts>
+            constexpr decltype(auto) as_tuple(std::tuple<Ts...> t) { return t; }
+
+        // Simple case
+        template<typename T>
+            constexpr decltype(auto) flatten(T t)
+            {
+                return t;
+            }
+
+        // No more recursion, (sizeof...Ts != 1) with above overload
+        template<typename ...Ts, std::enable_if_t<!(is_tuple<Ts>::value || ...), bool> = false>
+            constexpr decltype(auto) flatten(std::tuple<Ts...> t)
+            {
+                return t;
+            }
+
+        // Handle recursion
+        template<typename ...Ts, std::enable_if_t<(is_tuple<Ts>::value || ...), bool> = false>
+            constexpr decltype(auto) flatten(std::tuple<Ts...> t)
+            {
+                return std::apply([](auto...ts)
+                        {
+                        return flatten(std::tuple_cat(as_tuple(flatten(ts))...));
+                        }, t);
+            }
+    };
+
+    constexpr auto flatten_tuple(auto tuple) { return __flatten_tuple_detail::flatten(tuple); }
 };

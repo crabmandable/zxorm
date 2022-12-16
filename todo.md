@@ -1,6 +1,14 @@
 Note to self: start from top
 
+* Join
+
+* Syntax errors, more detail than "Logic error"
+
+* Statement caching
+
 * REGEXP
+
+* Docs
 
 * Bulk update
 
@@ -19,8 +27,6 @@ Note to self: start from top
 * Tests:
     * Constraints
     * Transactions
-
-* Statement caching
 
 FIX:
     duplicate column class

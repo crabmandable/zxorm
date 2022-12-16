@@ -109,3 +109,4 @@ TEST_F(TableTest, CreateWithConstraintsTableQuery) {
         "); ";
     ASSERT_EQ(trimmed, expected);
 }
+
