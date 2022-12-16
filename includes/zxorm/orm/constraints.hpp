@@ -26,7 +26,7 @@ namespace zxorm {
         constexpr const char* action_str(action_t c) {
             switch(c) {
                 case action_t::no_action:
-                    return "NO_ACTION";
+                    return "NO ACTION";
                 case action_t::restrict:
                     return "RESTRICT";
                 case action_t::set_null:
