@@ -228,7 +228,7 @@ namespace zxorm {
     template <class... Table>
     void Connection<Table...>::log_error(const Error& err)
     {
-        _logger(log_level::Error, std::string(err).c_str());
+        _logger(log_level::Error, err);
     }
 
     template <class... Table>

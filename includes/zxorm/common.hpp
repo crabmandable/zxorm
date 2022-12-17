@@ -17,7 +17,7 @@ namespace zxorm {
         Debug = 3,
     };
 
-    using Logger = std::function<void(log_level, const char*)>;
+    using Logger = std::function<void(log_level, const std::string_view&)>;
 
     template<size_t N>
     struct FixedLengthString {

@@ -29,9 +29,8 @@ namespace zxorm {
             _stmt = {stmt, [logger, handle](sqlite3_stmt* s) {
                 int result = sqlite3_finalize(s);
                 if (result != SQLITE_OK) {
-                    const char* str = sqlite3_errmsg(handle);
-                    logger(log_level::Error, "Unable to finalize statment");
-                    logger(log_level::Error, str);
+                    auto err = Error("Unable to finalize statement", handle);
+                    logger(log_level::Error, err);
                 }
             }};
 
@@ -50,10 +49,8 @@ namespace zxorm {
             sqlite3_stmt* stmt = nullptr;
             int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
-                const char* str = sqlite3_errmsg(handle);
-                logger(log_level::Error, "Unable to initialize statement");
-                logger(log_level::Error, str);
-                return Error("Unable to initialize statement", handle);
+                auto err = Error("Unable to initialize statement", handle);
+                logger(log_level::Error, err);
             }
 
             return Statement(handle, logger, stmt);

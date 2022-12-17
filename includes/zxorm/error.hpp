@@ -11,27 +11,36 @@
 
 namespace zxorm {
     struct Error {
-        Error(const char* const err, sqlite3* handle=nullptr) : err(err), handle{handle} {
+        Error(const char* const err, sqlite3* handle=nullptr) {
             if (handle)
                 sqlite_result = sqlite3_errcode(handle);
+
+            std::ostringstream os;
+            os << err;
+            if (sqlite_result != SQLITE_OK) {
+                os << ": ["
+                    << sqlite3_errstr(sqlite_result)
+                    << "] "
+                    << sqlite3_errmsg(handle);
+            }
+
+            err_str = os.str();
         }
-        const char* err;
-        sqlite3* handle;
+
+        std::string err_str;
         int sqlite_result = SQLITE_OK;
 
         friend std::ostream & operator<< (std::ostream &out, const Error& e) {
-            out << std::string(e.err);
-            if (e.sqlite_result != SQLITE_OK) {
-                const char* sql_err = sqlite3_errmsg(e.handle);
-                out <<": " + std::string(sql_err);
-            }
+            out << std::string(e.err_str);
             return out;
         }
 
         operator std::string () const {
-            std::ostringstream out;
-            out << *this;
-            return out.str();
+            return err_str;
+        }
+
+        operator std::string_view () const {
+            return err_str;
         }
     };
 
