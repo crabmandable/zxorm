@@ -30,21 +30,16 @@ using table1 = Table<"obj1", Object1, Column<"id", &Object1::id, PrimaryKey<>>>;
 
 using table2 = Table<"obj2", Object2,
     Column<"id", &Object2::id, PrimaryKey<>>,
-    Column<"obj1_id", &Object2::obj1_id, ForeignKey<Reference<"obj1", "id">>>
+    Column<"obj1_id", &Object2::obj1_id, ForeignKey<"obj1", "id">>
     >;
 
 using table3 = Table<"obj3", Object3,
     Column<"id", &Object3::id, PrimaryKey<>>,
-    Column<"obj1_id", &Object3::obj1_id, ForeignKey<Reference<"obj1", "id">>>,
-    Column<"obj2_id", &Object3::obj2_id, ForeignKey<Reference<"obj2", "id">>>
+    Column<"obj1_id", &Object3::obj1_id, ForeignKey<"obj1", "id">>,
+    Column<"obj2_id", &Object3::obj2_id, ForeignKey<"obj2", "id">>
         >;
 
-using table4 = Table<"obj4", Object4,
-    Column<"id", &Object4::id, PrimaryKey<>>,
-    Column<"two_at_once", &Object4::both, ForeignKey<Reference<"obj1", "id">>, ForeignKey<Reference<"obj2", "id">>>
-        >;
-
-using connection_t = Connection<table1, table2, table3, table4>;
+using connection_t = Connection<table1, table2, table3>;
 
 class ForeignKeysTest : public ::testing::Test {
     protected:
@@ -68,19 +63,26 @@ class ForeignKeysTest : public ::testing::Test {
     }
 };
 
-TEST_F(ForeignKeysTest, PrintNoForiegnKeys) {
-    table1::print_foreign_keys();
+TEST_F(ForeignKeysTest, NoForiegnKeys) {
+    ASSERT_EQ(0, std::tuple_size<table1::foreign_columns_t>());
 }
 
-TEST_F(ForeignKeysTest, PrintOneForiegnKey) {
-    table2::print_foreign_keys();
+TEST_F(ForeignKeysTest, OneForiegnKey) {
+    ASSERT_EQ(1, std::tuple_size<table2::foreign_columns_t>());
+    using fk = std::remove_reference_t<decltype(std::get<0>(table2::foreign_columns_t{}))>;
+    ASSERT_STREQ(fk::name.value, "obj1_id");
 }
 
-TEST_F(ForeignKeysTest, PrintForiegnKeys) {
-    table3::print_foreign_keys();
+TEST_F(ForeignKeysTest, ForiegnKeys) {
+    ASSERT_EQ(2, std::tuple_size<table3::foreign_columns_t>());
+    using fk1 = std::remove_reference_t<decltype(std::get<0>(table3::foreign_columns_t{}))>;
+    ASSERT_STREQ(fk1::name.value, "obj1_id");
+    using fk2 = std::remove_reference_t<decltype(std::get<1>(table3::foreign_columns_t{}))>;
+    ASSERT_STREQ(fk2::name.value, "obj2_id");
 }
 
-TEST_F(ForeignKeysTest, PrintMultipleForiegnKeyForOneColumn) {
-    table4::print_foreign_keys();
+TEST_F(ForeignKeysTest, FindForeignColumn) {
+    using column_t = typename table3::foreign_column<"obj1">;
+    ASSERT_STREQ("obj1_id", column_t::name.value);
+    using column2_t = typename table3::foreign_column<"obj222">;
 }
-

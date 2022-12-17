@@ -15,12 +15,47 @@ namespace zxorm {
 
         template <typename... Ts, typename U, typename... Us>
         struct foreign_only_impl<std::tuple<Ts...>, U, Us...>
-            : std::conditional_t<(std::tuple_size<typename U::foreign_keys_t>() > 0)
+            : std::conditional_t<(not std::is_same_v<std::false_type, typename U::foreign_key_t>)
                                 , foreign_only_impl<std::tuple<Ts..., U>, Us...>
                                 , foreign_only_impl<std::tuple<Ts...>, Us...>> {};
 
         template <typename... Columns>
         using foreign_only_t = typename foreign_only_impl<std::tuple<>, Columns...>::type;
+
+        template<FixedLengthString foreign_table, typename... foreign_columns>
+        static constexpr std::array<bool, sizeof...(foreign_columns)> does_column_reference_table {
+            (foreign_columns::foreign_key_t::table_name == foreign_table)...
+        };
+
+        // unused base case, just needed for specializtion to unwrap tuple
+        template<FixedLengthString, typename T>
+        struct index_of_foreign_table {
+            static_assert(std::is_same_v<std::false_type, T>, "index of foreign table should only be used with a tuple");
+            int value = -1;
+        };
+
+        template<FixedLengthString foreign_table, typename ...T>
+        struct index_of_foreign_table<foreign_table, std::tuple<T...>>
+        {
+            private:
+            static constexpr int _impl() {
+                constexpr auto answers = does_column_reference_table<foreign_table, T...>;
+                const auto it = std::find(answers.begin(), answers.end(), true);
+
+                if (it == answers.end()) return -1;
+                return std::distance(answers.begin(), it);
+            }
+
+            public:
+            static constexpr int value = _impl();
+        };
+
+        template <FixedLengthString foreign_table, typename foreign_key_tuple>
+        using column_with_reference_t = decltype(
+            std::get<index_of_foreign_table<foreign_table, foreign_key_tuple>::value>(
+                foreign_key_tuple{}
+            )
+        );
     };
 
 template <FixedLengthString table_name, class T, class... Column>
@@ -69,19 +104,19 @@ class Table {
 
         using foreign_columns_t = __foreign_key_detail::foreign_only_t<Column...>;
 
+        // TODO: fix atrocious errors if the table doesn't exist
+        // it's like pages and pages of crap
+        template <FixedLengthString foreign_table>
+        using foreign_column = std::remove_reference_t<__foreign_key_detail::column_with_reference_t<foreign_table, foreign_columns_t>>;
+
         static void print_foreign_keys() {
             std::apply([&](const auto&... a) {
                 ([&]() {
                     using column_t = std::remove_reference_t<decltype(a)>;
                     std::cout << "column: " << column_t::name.value << std::endl;
-                    std::cout << "foreign keys: " << std::endl;
-                    std::apply([&](const auto&... b) {
-                        ([&]() {
-                            using fk_t = std::remove_reference_t<decltype(b)>;
-                            std::cout << "\t" << fk_t::reference_t::table_name.value
-                                << "\t" << fk_t::reference_t::column_name.value << std::endl;
-                         }(), ...);
-                    }, typename column_t::foreign_keys_t{});
+                    std::cout << "foreign key: " << std::endl;
+                    using fk_t = typename column_t::foreign_key_t;
+                    std::cout << "\t" << fk_t::table_name.value << "," << fk_t::column_name.value << std::endl;
                 }(), ...);
             }, foreign_columns_t{});
         }

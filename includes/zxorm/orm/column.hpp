@@ -23,7 +23,17 @@ namespace zxorm {
         using fk_or_false = typename std::conditional_t<std::is_base_of_v<IsForeignKeyTrait, Constraint>, Constraint, std::false_type>;
 
         template <typename... Constraint>
-        using foreign_keys_t = remove_from_tuple<std::false_type, fk_or_false<Constraint>...>;
+        static constexpr bool duplicate_foreign_key = std::tuple_size<remove_from_tuple<std::false_type, fk_or_false<Constraint>...>>() > 1;
+
+        template <typename... Constraint>
+        struct foreign_key : std::type_identity<std::false_type> {};
+
+        template <typename... Constraint>
+        requires (any_of<std::is_base_of_v<IsForeignKeyTrait, Constraint>...>)
+        struct foreign_key<Constraint...>
+            : std::type_identity<
+                decltype(std::get<0>(remove_from_tuple<std::false_type, fk_or_false<Constraint>...>{}))
+            > {};
 
         static inline std::string constraint_creation_query(auto constraints) {
             std::stringstream ss;
@@ -67,11 +77,12 @@ namespace zxorm {
         public:
         static constexpr bool public_column = true;
         using member_t = typename find_column_traits<decltype(M)>::type;
-        static_assert(!std::is_same<member_t, std::false_type>::value, "Column template argument should be a pointer to a class member");
+        static_assert(not std::is_same<member_t, std::false_type>::value, "Column template argument should be a pointer to a class member");
         using object_class = typename find_column_traits<decltype(M)>::klass;
         using constraints_t = typename __constraint_t_detail::constraints<member_t, Constraint...>::type;
 
-        using foreign_keys_t = typename __constraint_t_detail::foreign_keys_t<Constraint...>;
+        static_assert(not __constraint_t_detail::duplicate_foreign_key<Constraint...>, "zxorm does not support multiple foreign keys on a single column");
+        using foreign_key_t = std::remove_reference_t<typename __constraint_t_detail::foreign_key<Constraint...>::type>;
 
         static constexpr sqlite_column_type sql_column_type = member_to_sql_type<member_t>::value;
 
@@ -149,7 +160,9 @@ namespace zxorm {
         using object_class = typename setter_traits::klass;
 
         using constraints_t = typename __constraint_t_detail::constraints<member_t, Constraint...>::type;
-        using foreign_keys_t = typename __constraint_t_detail::foreign_keys_t<Constraint...>;
+
+        static_assert(not __constraint_t_detail::duplicate_foreign_key<Constraint...>, "zxorm does not support multiple foreign keys on a single column");
+        using foreign_key_t = typename __constraint_t_detail::foreign_key<Constraint...>::type;
 
         static constexpr bool is_primary_key = any_of<constraint_is_primary_key<Constraint>::value...>;
         static constexpr bool is_auto_inc_column = any_of<constraint_is_primary_key<Constraint>::value...> && sql_column_type == sqlite_column_type::INTEGER;

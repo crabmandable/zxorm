@@ -57,7 +57,7 @@ using table_with_column_constraints_t = Table<"test_constraints", Object3,
     Column<"name", &Object3::_name, NotNull<>, Unique<>>,
     Column<"text", &Object3::_some_text, Unique<conflict_t::replace>>,
     Column<"float", &Object3::_some_float>,
-    Column<"someId", &Object3::_some_id, ForeignKey<Reference<"test", "id">, action_t::cascade, action_t::restrict>>
+    Column<"someId", &Object3::_some_id, ForeignKey<"test", "id", action_t::cascade, action_t::restrict>>
         >;
 
 using connection_t = Connection<table_t, tablepriv_t, table_with_column_constraints_t>;

@@ -58,30 +58,18 @@ namespace zxorm {
         }
     }
 
-    template<FixedLengthString _table_name, FixedLengthString _column_name>
-        struct Reference {
-            static constexpr auto table_name = _table_name;
-            static constexpr auto column_name = _column_name;
-
-            static std::string to_string() {
-                std::ostringstream ss;
-                ss << "REFERENCES `" << table_name.value << "` "
-                    << "(`" << column_name.value << "`)";
-
-                return ss.str();
-            }
-        };
-
     struct IsForeignKeyTrait {};
 
     // TODO support defferrable
-    template<typename Reference, action_t on_update=action_t::no_action, action_t on_delete=action_t::no_action>
+    template<FixedLengthString _table_name, FixedLengthString _column_name, action_t on_update=action_t::no_action, action_t on_delete=action_t::no_action>
     struct ForeignKey : IsForeignKeyTrait {
-        using reference_t = Reference;
+        static constexpr auto table_name = _table_name;
+        static constexpr auto column_name = _column_name;
 
         static std::string to_string() {
             std::ostringstream ss;
-            ss << Reference::to_string()
+            ss << "REFERENCES `" << table_name.value << "` "
+                << "(`" << column_name.value << "`)"
                 << " ON UPDATE " << __constraint_enum_to_str::action_str(on_update)
                 << " ON DELETE " << __constraint_enum_to_str::action_str(on_delete);
             return ss.str();
