@@ -11,14 +11,18 @@
 
 namespace zxorm {
     struct Error {
-        Error(const char* const err, int sqlite_result=SQLITE_OK) : err(err), sqlite_result(sqlite_result) {}
+        Error(const char* const err, sqlite3* handle=nullptr) : err(err), handle{handle} {
+            if (handle)
+                sqlite_result = sqlite3_errcode(handle);
+        }
         const char* err;
-        int sqlite_result;
+        sqlite3* handle;
+        int sqlite_result = SQLITE_OK;
 
         friend std::ostream & operator<< (std::ostream &out, const Error& e) {
             out << std::string(e.err);
             if (e.sqlite_result != SQLITE_OK) {
-                const char* sql_err = sqlite3_errstr(e.sqlite_result);
+                const char* sql_err = sqlite3_errmsg(e.handle);
                 out <<": " + std::string(sql_err);
             }
             return out;

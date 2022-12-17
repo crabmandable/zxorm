@@ -142,12 +142,12 @@ namespace zxorm {
         sqlite3* db_handle = nullptr;
         int result = sqlite3_open_v2(file_name, &db_handle, flags, z_vfs);
         if (result != SQLITE_OK || !db_handle) {
-            const char* str = sqlite3_errstr(result);
+            const char* str = db_handle ? sqlite3_errmsg(db_handle) : sqlite3_errstr(result);
             if (logger) {
                 logger(log_level::Error, "Unable to open sqlite connection");
                 logger(log_level::Error, str);
             }
-            return Error("Unable to open sqlite connection", result);
+            return Error("Unable to open sqlite connection", db_handle);
         }
 
         return Connection({db_handle}, logger);
@@ -162,7 +162,7 @@ namespace zxorm {
         _db_handle = {db_handle, [logger](sqlite3* handle) {
             int result = sqlite3_close_v2(handle);
             if (result != SQLITE_OK) {
-                const char* str = sqlite3_errstr(result);
+                const char* str = sqlite3_errmsg(handle);
                 if (logger) {
                     logger(log_level::Error, "Unable to destruct connection");
                     logger(log_level::Error, str);

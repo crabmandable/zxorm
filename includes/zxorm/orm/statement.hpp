@@ -15,6 +15,7 @@
 namespace zxorm {
     class Statement {
         private:
+        sqlite3* _handle;
         Logger _logger;
         std::unique_ptr<sqlite3_stmt, std::function<void(sqlite3_stmt*)>> _stmt;
         size_t _parameter_count;
@@ -24,11 +25,11 @@ namespace zxorm {
         size_t _step_count = 0;
         bool _done = false;
 
-        Statement(Logger logger, sqlite3_stmt* stmt) : _logger{logger} {
-            _stmt = {stmt, [logger](sqlite3_stmt* s) {
+        Statement(sqlite3* handle, Logger logger, sqlite3_stmt* stmt) : _handle{handle}, _logger{logger} {
+            _stmt = {stmt, [logger, handle](sqlite3_stmt* s) {
                 int result = sqlite3_finalize(s);
                 if (result != SQLITE_OK) {
-                    const char* str = sqlite3_errstr(result);
+                    const char* str = sqlite3_errmsg(handle);
                     logger(log_level::Error, "Unable to finalize statment");
                     logger(log_level::Error, str);
                 }
@@ -49,13 +50,13 @@ namespace zxorm {
             sqlite3_stmt* stmt = nullptr;
             int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
-                const char* str = sqlite3_errstr(result);
+                const char* str = sqlite3_errmsg(handle);
                 logger(log_level::Error, "Unable to initialize statement");
                 logger(log_level::Error, str);
-                return Error("Unable to initialize statement", result);
+                return Error("Unable to initialize statement", handle);
             }
 
-            return Statement(logger, stmt);
+            return Statement(handle, logger, stmt);
         }
 
         [[nodiscard]] OptionalError bind(auto tuple)
@@ -105,7 +106,7 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                return Error("Unable to bind parameter to statment", result);
+                return Error("Unable to bind parameter to statment", _handle);
             }
             _is_bound[idx] = true;
             return std::nullopt;
@@ -136,7 +137,7 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                return Error("Unable to bind parameter to statment", result);
+                return Error("Unable to bind parameter to statment", _handle);
             }
 
             _is_bound[idx] = true;
@@ -147,7 +148,7 @@ namespace zxorm {
         [[nodiscard]] OptionalError rewind() {
             int result = sqlite3_reset(_stmt.get());
             if (result != SQLITE_OK) {
-                return Error( "Unable to reset statment", result);
+                return Error( "Unable to reset statment", _handle);
             }
             _done = false;
             _step_count = 0;
@@ -160,7 +161,7 @@ namespace zxorm {
 
             int result = sqlite3_clear_bindings(_stmt.get());
             if (result != SQLITE_OK) {
-                return Error( "Unable to clear bindings", result);
+                return Error( "Unable to clear bindings", _handle);
             }
             for (auto& [_, v] : _is_bound) v = false;
 
@@ -179,7 +180,7 @@ namespace zxorm {
             int result = sqlite3_step(_stmt.get());
             _step_count++;
             if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
-                return Error("Unable to execute statment", result);
+                return Error("Unable to execute statment", _handle);
             }
 
             _done = result == SQLITE_DONE;
