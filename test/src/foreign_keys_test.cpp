@@ -84,5 +84,4 @@ TEST_F(ForeignKeysTest, ForiegnKeys) {
 TEST_F(ForeignKeysTest, FindForeignColumn) {
     using column_t = typename table3::foreign_column<"obj1">;
     ASSERT_STREQ("obj1_id", column_t::name.value);
-    using column2_t = typename table3::foreign_column<"obj222">;
 }
