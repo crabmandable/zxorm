@@ -8,6 +8,20 @@
 #include "zxorm/orm/field.hpp"
 
 namespace zxorm {
+    namespace __foreign_key_detail {
+
+        template <typename T, typename... Ts>
+        struct foreign_only_impl: std::type_identity<T> {};
+
+        template <typename... Ts, typename U, typename... Us>
+        struct foreign_only_impl<std::tuple<Ts...>, U, Us...>
+            : std::conditional_t<(std::tuple_size<typename U::foreign_keys_t>() > 0)
+                                , foreign_only_impl<std::tuple<Ts..., U>, Us...>
+                                , foreign_only_impl<std::tuple<Ts...>, Us...>> {};
+
+        template <typename... Columns>
+        using foreign_only_t = typename foreign_only_impl<std::tuple<>, Columns...>::type;
+    };
 
 template <FixedLengthString table_name, class T, class... Column>
 class Table {
@@ -53,16 +67,23 @@ class Table {
         using object_class = T;
         using columns_t = std::tuple<Column...>;
 
-        using foreign_keys_t = decltype(flatten_tuple(remove_from_tuple<std::tuple<>, typename Column::foreign_keys_t...>{}));
+        using foreign_columns_t = __foreign_key_detail::foreign_only_t<Column...>;
 
-        static void print_foriegn_keys() {
+        static void print_foreign_keys() {
             std::apply([&](const auto&... a) {
                 ([&]() {
-                    using fk_t = std::remove_reference_t<decltype(a)>;
-                    std::cout << "table: " << fk_t::reference_t::table_name.value
-                        << ", column: " << fk_t::reference_t::column_name.value << std::endl;
+                    using column_t = std::remove_reference_t<decltype(a)>;
+                    std::cout << "column: " << column_t::name.value << std::endl;
+                    std::cout << "foreign keys: " << std::endl;
+                    std::apply([&](const auto&... b) {
+                        ([&]() {
+                            using fk_t = std::remove_reference_t<decltype(b)>;
+                            std::cout << "\t" << fk_t::reference_t::table_name.value
+                                << "\t" << fk_t::reference_t::column_name.value << std::endl;
+                         }(), ...);
+                    }, typename column_t::foreign_keys_t{});
                 }(), ...);
-            }, foreign_keys_t{});
+            }, foreign_columns_t{});
         }
 
         template <FixedLengthString name>

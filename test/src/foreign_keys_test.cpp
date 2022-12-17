@@ -19,8 +19,11 @@ struct Object3 {
     int id = 0;
     int obj1_id = 0;
     int obj2_id = 0;
-    std::string more;
-    std::string data;
+};
+
+struct Object4 {
+    int id = 0;
+    int both = 0;
 };
 
 using table1 = Table<"obj1", Object1, Column<"id", &Object1::id, PrimaryKey<>>>;
@@ -36,11 +39,17 @@ using table3 = Table<"obj3", Object3,
     Column<"obj2_id", &Object3::obj2_id, ForeignKey<Reference<"obj2", "id">>>
         >;
 
-using connection_t = Connection<table1, table2, table3>;
+using table4 = Table<"obj4", Object4,
+    Column<"id", &Object4::id, PrimaryKey<>>,
+    Column<"two_at_once", &Object4::both, ForeignKey<Reference<"obj1", "id">>, ForeignKey<Reference<"obj2", "id">>>
+        >;
+
+using connection_t = Connection<table1, table2, table3, table4>;
 
 class ForeignKeysTest : public ::testing::Test {
     protected:
     void SetUp() override {
+        return;
         auto created_conn = connection_t::create("test.db", 0, 0, &logger);
 
         ASSERT_TRUE(created_conn);
@@ -59,12 +68,19 @@ class ForeignKeysTest : public ::testing::Test {
     }
 };
 
-TEST_F(ForeignKeysTest, PrintForiegnKeys) {
-    table3::print_foriegn_keys();
+TEST_F(ForeignKeysTest, PrintNoForiegnKeys) {
+    table1::print_foreign_keys();
 }
 
 TEST_F(ForeignKeysTest, PrintOneForiegnKey) {
-    table2::print_foriegn_keys();
+    table2::print_foreign_keys();
 }
 
-//TODO add a table that has multiple fk constraints for a single column
+TEST_F(ForeignKeysTest, PrintForiegnKeys) {
+    table3::print_foreign_keys();
+}
+
+TEST_F(ForeignKeysTest, PrintMultipleForiegnKeyForOneColumn) {
+    table4::print_foreign_keys();
+}
+

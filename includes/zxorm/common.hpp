@@ -211,4 +211,9 @@ namespace zxorm {
     };
 
     constexpr auto flatten_tuple(auto tuple) { return __flatten_tuple_detail::flatten(tuple); }
+
+    template<typename T>
+    void dump_type () {
+        printf("%s\n", __PRETTY_FUNCTION__);
+    }
 };
