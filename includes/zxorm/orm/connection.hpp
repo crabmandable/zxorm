@@ -473,8 +473,7 @@ namespace zxorm {
     OptionalError Connection<Table...>::delete_where(const Expression& e)
     {
         using table_t = typename table_for_class<T>::type;
-        return Delete<table_t, decltype(e.bindings())>(
-            _db_handle.get(), _logger, e.serialize(), e.bindings()).exec();
+        return Delete<table_t>(_db_handle.get(), _logger).where(e).exec();
     }
 
     template <class... Table>
@@ -489,7 +488,7 @@ namespace zxorm {
     template <class... Table>
     template<class T>
     auto Connection<Table...>::all() ->
-        Select<typename table_for_class<T>::type, std::tuple<>>
+        Select<typename table_for_class<T>::type>
     {
         using table_t = typename table_for_class<T>::type;
         return make_select<table_t>();

@@ -1,45 +1,28 @@
 #pragma once
+#include <sqlite3.h>
 #include "zxorm/common.hpp"
 #include "zxorm/result.hpp"
-#include "zxorm/orm/statement.hpp"
+#include "zxorm/orm/query.hpp"
 #include "zxorm/orm/record_iterator.hpp"
-#include "zxorm/orm/query_serializer.hpp"
-#include "zxorm/orm/where.hpp"
-#include <sqlite3.h>
 
 namespace zxorm {
-    template <class Table, typename Bindings = std::tuple<>>
-    class Select {
+    template <class Table>
+    class Select : public Query {
     private:
-        using binder_t = std::function<OptionalError(Statement&)>;
-        sqlite3* _handle;
-        Logger _logger;
-        std::shared_ptr<WhereBase> _where;
+
         std::string _limit_clause;
         std::string _order_clause;
 
-        Result<Statement> prepare() {
-            auto query = QuerySerializer(query_type_t::SELECT, Table::name).serialize([&](std::ostream& ss) {
-                if (_where) {
-                    ss << _where->clause << " ";
-                }
-                ss << _order_clause << " " << _limit_clause;
-            });
-            ZXORM_GET_RESULT(Statement stmt, Statement::create(_handle, _logger, query));
-
-            if (_where) {
-                ZXORM_TRY(_where->bind(stmt));
-            }
-
-            return stmt;
+        virtual void serialize(std::ostream& ss) override {
+            ss << _order_clause << " " << _limit_clause;
         }
 
     public:
-        Select(sqlite3* handle, Logger logger) : _handle(handle), _logger(logger) {}
+        Select(sqlite3* handle, Logger logger) :
+            Query(query_type_t::SELECT, Table::name, handle, logger) {}
 
-        template <typename Expression>
-        auto where(const Expression& e) {
-            _where = std::make_shared<Where<decltype(e.bindings())>>(e);
+        auto where(auto&&... args) {
+            Query::where(std::forward<decltype(args)>(args)...);
             return *this;
         }
 
