@@ -103,14 +103,14 @@ namespace zxorm {
 
         template<class T, class Expression>
             [[nodiscard]] auto where(const Expression& e) ->
-                Select<typename table_for_class<T>::type, decltype(e.bindings())>;
+                Select<typename table_for_class<T>::type>;
 
         template<class T, class Expression>
             OptionalError delete_where(const Expression& e);
 
         template<class T>
             [[nodiscard]] auto all() ->
-                Select<typename table_for_class<T>::type, std::tuple<>>;
+                Select<typename table_for_class<T>::type>;
 
         template<class T>
         [[nodiscard]] auto first();
@@ -190,22 +190,10 @@ namespace zxorm {
     }
 
     template <class... Table>
-    template<class T, class Expression>
-    auto Connection<Table...>::make_select(const Expression& e)
-    {
-        return Select<T, decltype(e.bindings())>(
-            _db_handle.get(),
-            _logger,
-            e.serialize(),
-            e.bindings()
-        );
-    }
-
-    template <class... Table>
     template<class T>
     auto Connection<Table...>::make_select()
     {
-        return Select<T, std::tuple<>>(
+        return Select<T>(
             _db_handle.get(),
             _logger
         );
@@ -461,8 +449,7 @@ namespace zxorm {
                 "Primary key type does not match the type specified in the definition of the table");
 
         auto e = Field<table_t, primary_key_t::name>() == id;
-        return Select<table_t, decltype(e.bindings())>(
-                _db_handle.get(), _logger, e.serialize(), e.bindings()).one();
+        return make_select<table_t>().where(e).one();
     }
 
     template <class... Table>
@@ -493,10 +480,10 @@ namespace zxorm {
     template <class... Table>
     template<class T, class Expression>
     auto Connection<Table...>::where(const Expression& e) ->
-        Select<typename table_for_class<T>::type, decltype(e.bindings())>
+        Select<typename table_for_class<T>::type>
     {
         using table_t = typename table_for_class<T>::type;
-        return make_select<table_t>(e);
+        return make_select<table_t>().where(e);
     }
 
     template <class... Table>

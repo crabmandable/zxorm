@@ -44,7 +44,6 @@ using connection_t = Connection<table1, table2, table3>;
 class ForeignKeysTest : public ::testing::Test {
     protected:
     void SetUp() override {
-        return;
         auto created_conn = connection_t::create("test.db", 0, 0, &logger);
 
         ASSERT_TRUE(created_conn);
