@@ -84,3 +84,61 @@ TEST_F(ForeignKeysTest, FindForeignColumn) {
     using column_t = typename table3::foreign_column<"obj1">;
     ASSERT_STREQ("obj1_id", column_t::name.value);
 }
+
+TEST_F(ForeignKeysTest, JoinQueryReturningNothing) {
+    auto result = my_conn->all<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 0);
+
+    // should be able to swap the params around and get the same query
+    result = my_conn->all<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    iter = result.value();
+    vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 0);
+}
+
+TEST_F(ForeignKeysTest, JoinQueryReturningSomething) {
+    std::vector<Object1> obj1s;
+    obj1s.resize(10);
+    auto err = my_conn->insert_many_records(obj1s);
+    ASSERT_FALSE(err);
+
+    std::vector<Object2> obj2s;
+    for (int i = 1; i <= 3; i++) {
+        obj2s.push_back({.obj1_id = i});
+    }
+    err = my_conn->insert_many_records(obj2s);
+    ASSERT_FALSE(err);
+
+    auto result = my_conn->all<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 3);
+
+    // should be able to swap the params around and get the same query
+    result = my_conn->all<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    iter = result.value();
+    vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 3);
+}

@@ -153,15 +153,19 @@ class Table {
             std::ostringstream ss;
             ss << "INSERT INTO `" << table_name.value << "` (";
 
-            size_t n_query_columns = n_columns;
+            // used to tell us when to insert a NULL for the auto increment column
+            bool auto_inc_idx = -1;
+
             std::apply([&](const auto&... a) {
+                int i = 0;
                 ([&]() {
                     using column_t = std::remove_reference_t<decltype(a)>;
                     if constexpr (column_t::is_auto_inc_column) {
-                        n_query_columns--;
-                    } else {
-                        ss << "`" << column_t::name.value << "`, ";
+                        auto_inc_idx = i;
                     }
+
+                    ss << "`" << column_t::name.value << "`, ";
+                    i++;
                 }(), ...);
             }, columns_t{});
 
@@ -174,12 +178,11 @@ class Table {
             for (size_t i = 0; i < n_rows; i++) {
                 std::ostringstream val;
                 val << "(";
-                for (size_t i = 0; i < n_query_columns; i++) {
-                    if (i == n_query_columns - 1) {
-                        val << "?), ";
-                    } else  {
-                        val << "?, ";
-                    }
+                for (size_t i = 0; i < n_columns; i++) {
+                    // auto inc column gets a null
+                    val << (i == auto_inc_idx ? "NULL" : "?");
+                    // last column needs to close the paren
+                    val << (i == n_columns - 1 ? "), " : ", ");
                 }
 
                 auto v = val.str();

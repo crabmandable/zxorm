@@ -18,6 +18,27 @@ namespace zxorm {
         return out;
     };
 
+    enum join_type_t {
+        INNER,
+        OUTER,
+        CROSS,
+    };
+
+    static inline std::ostream & operator<< (std::ostream &out, const join_type_t& type) {
+        switch (type) {
+            case join_type_t::INNER:
+                out << "INNER JOIN ";
+                break;
+            case join_type_t::OUTER:
+                out << "OUTER JOIN ";
+                break;
+            case join_type_t::CROSS:
+                out << "CROSS JOIN ";
+                break;
+        };
+        return out;
+    };
+
     class QuerySerializer {
     public:
     private:
@@ -26,7 +47,7 @@ namespace zxorm {
 
         std::ostream& column_clause(std::ostream& out) const {
             if (_type == query_type_t::SELECT) {
-                out << "* ";
+                out <<  "`" << _from << "`.* ";
             }
             return out;
         }

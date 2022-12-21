@@ -7,8 +7,10 @@
 
 namespace zxorm {
     template <class Table>
-    class Select : public Query {
+    class Select : public Query<Table> {
     private:
+
+        using Super = Query<Table>;
 
         std::string _limit_clause;
         std::string _order_clause;
@@ -19,10 +21,16 @@ namespace zxorm {
 
     public:
         Select(sqlite3* handle, Logger logger) :
-            Query(query_type_t::SELECT, Table::name, handle, logger) {}
+            Super(query_type_t::SELECT, handle, logger) {}
 
         auto where(auto&&... args) {
-            Query::where(std::forward<decltype(args)>(args)...);
+            Super::where(std::forward<decltype(args)>(args)...);
+            return *this;
+        }
+
+        template <Field field_a, Field field_b>
+        auto join(join_type_t type = join_type_t::INNER) {
+            Super::template join<field_a, field_b>(type);
             return *this;
         }
 
@@ -47,7 +55,7 @@ namespace zxorm {
         OptionalResult<typename Table::object_class> one() {
             assert(_limit_clause.empty());
             limit(1);
-            ZXORM_GET_RESULT(Statement s, prepare());
+            ZXORM_GET_RESULT(Statement s, Super::prepare());
             ZXORM_TRY(s.step());
             if (s.done()) {
                 return std::nullopt;
@@ -56,7 +64,7 @@ namespace zxorm {
         }
 
         Result<RecordIterator<Table>> many() {
-            auto s = prepare();
+            auto s = Super::prepare();
             if (s.is_error()) {
                 return s.error();
             }

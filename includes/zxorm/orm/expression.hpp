@@ -100,7 +100,7 @@ namespace zxorm {
         }
     };
 
-    template <typename Column, comparison_op_t op, typename RHS>
+    template <typename Table, typename Column, comparison_op_t op, typename RHS>
     struct ColumnExpression {
         RHS to_bind;
         ColumnExpression(RHS rhs) : to_bind{rhs} {}
@@ -117,7 +117,7 @@ namespace zxorm {
 
         std::string serialize() const {
             std::stringstream ss;
-            ss << "`" << Column::name.value << "` " << op << " ?";
+            ss << "`" << Table::name << "`.`" << Column::name.value << "` " << op << " ?";
             return ss.str();
         }
 
