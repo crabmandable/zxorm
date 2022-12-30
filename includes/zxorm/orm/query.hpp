@@ -49,6 +49,23 @@ namespace zxorm {
             return *this;
         }
 
+        template <FixedLengthString foreign_table>
+        auto join(join_type_t type = join_type_t::INNER) {
+            static_assert(Table::template does_reference_table<foreign_table>,
+                    "The selected table does not contain a foreign key referencing this table");
+
+            using select_column = typename Table::foreign_column<foreign_table>;
+            using foreign_key_t = typename select_column::foreign_key_t;
+
+            std::ostringstream ss;
+            ss << type << "`" << foreign_key_t::table_name.value << "`"
+                << " ON `" << _table_name << "`.`" << select_column::name.value << "`"
+                << " = `" << foreign_key_t::table_name.value << "`.`" << foreign_key_t::column_name.value << "`";
+            _join =  ss.str();
+
+            return *this;
+        }
+
         template <Field FieldA, Field FieldB>
         auto join(join_type_t type = join_type_t::INNER) {
             using field_a_t = decltype(FieldA);

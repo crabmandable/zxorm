@@ -108,6 +108,9 @@ class Table {
         template <FixedLengthString foreign_table>
         using foreign_column = std::remove_reference_t<__foreign_key_detail::column_with_reference_t<foreign_table, foreign_columns_t>>;
 
+        template <FixedLengthString foreign_table>
+        static constexpr bool does_reference_table = __foreign_key_detail::index_of_foreign_table<foreign_table, foreign_columns_t>::value >= 0;
+
         static void print_foreign_keys() {
             std::apply([&](const auto&... a) {
                 ([&]() {

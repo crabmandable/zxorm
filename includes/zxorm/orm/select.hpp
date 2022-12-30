@@ -34,6 +34,12 @@ namespace zxorm {
             return *this;
         }
 
+        template <FixedLengthString foreign_table>
+        auto join(join_type_t type = join_type_t::INNER) {
+            Super::template join<foreign_table>(type);
+            return *this;
+        }
+
         auto limit(unsigned long limit) {
             std::stringstream ss;
             ss << "LIMIT " << limit;

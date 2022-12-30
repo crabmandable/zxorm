@@ -24,6 +24,12 @@ namespace zxorm {
             return *this;
         }
 
+        template <FixedLengthString foreign_table>
+        auto join(join_type_t type = join_type_t::INNER) {
+            Super::template join<foreign_table>(type);
+            return *this;
+        }
+
         OptionalError exec() {
             ZXORM_GET_RESULT(Statement s, Super::prepare());
             return s.step();
