@@ -7,10 +7,9 @@ Note to self: start from top
 
     OUTER JOIN is currently useless, since the selected columns are not dynamic
 
-    Should get rid of `all` and replace it with a general `select` method that
-    allows specifying more than one table to be returned
+    `select` method should allow specifying more than one table to be returned
 
-    The new `select` method should automatically generate the `join` clause if more
+    `select` method should automatically generate the `join` clause if more
     than one table is selected, and it is possible to determine the join based on
     the foreign key
     e.g
@@ -22,6 +21,8 @@ Note to self: start from top
     This means making the `join` clause on the `Query` a vector of clauses
 
 * Allow using string names, or table classes instead of only objects for query methods
+
+* Count with query
 
 * Statement caching
 

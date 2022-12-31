@@ -6,22 +6,31 @@
 #include "zxorm/orm/record_iterator.hpp"
 
 namespace zxorm {
-    template <class Table>
-    class Select : public Query<Table> {
-    private:
+    namespace __select_detail {
+        template <typename Table>
+        struct SelectColumnClause {
+            friend std::ostream & operator<< (std::ostream &out, const SelectColumnClause<Table>&) {
+                out << "SELECT `" << Table::name << "`.* ";
+                return out;
+            }
+        };
+    };
 
-        using Super = Query<Table>;
+    template <class Table>
+    class Select : public Query<Table, __select_detail::SelectColumnClause<Table>> {
+    private:
+        using Super = Query<Table, __select_detail::SelectColumnClause<Table>>;
 
         std::string _limit_clause;
         std::string _order_clause;
 
-        virtual void serialize(std::ostream& ss) override {
+        virtual void serialize_limits(std::ostream& ss) override {
             ss << _order_clause << " " << _limit_clause;
         }
 
     public:
         Select(sqlite3* handle, Logger logger) :
-            Super(query_type_t::SELECT, handle, logger) {}
+            Super(handle, logger) {}
 
         auto where(auto&&... args) {
             Super::where(std::forward<decltype(args)>(args)...);

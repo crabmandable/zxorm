@@ -3,35 +3,62 @@
 #include "zxorm/result.hpp"
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
-#include "zxorm/orm/query_serializer.hpp"
 #include "zxorm/orm/clause.hpp"
 #include "zxorm/orm/field.hpp"
 #include <sqlite3.h>
 
 namespace zxorm {
-    template <typename Table>
+    enum join_type_t {
+        INNER,
+        OUTER,
+        CROSS,
+    };
+
+    static inline std::ostream & operator<< (std::ostream &out, const join_type_t& type) {
+        switch (type) {
+            case join_type_t::INNER:
+                out << "INNER JOIN ";
+                break;
+            case join_type_t::OUTER:
+                out << "OUTER JOIN ";
+                break;
+            case join_type_t::CROSS:
+                out << "CROSS JOIN ";
+                break;
+        };
+        return out;
+    };
+
+    template <typename Table, typename ColumnClause>
     class Query {
     protected:
-        query_type_t _query_type;
         const char* _table_name = Table::name;
         sqlite3* _handle;
         Logger _logger;
         std::string _join;
         std::shared_ptr<ClauseBase> _where;
 
-        virtual void serialize(std::ostream& ) {}
+        // TODO: this is werid, think of a better way
+        virtual void serialize_limits(std::ostream& ) {}
 
         Result<Statement> prepare() {
-            auto query = QuerySerializer(_query_type, _table_name).serialize([&](std::ostream& ss) {
-                if (not _join.empty()) {
-                    ss << _join << " ";
-                }
-                if (_where) {
-                    ss << _where->clause << " ";
-                }
-                serialize(ss);
-            });
-            ZXORM_GET_RESULT(Statement stmt, Statement::create(_handle, _logger, query));
+
+            std::stringstream ss;
+            ss << ColumnClause();
+            ss << "FROM `" << _table_name << "` ";
+
+            if (not _join.empty()) {
+                ss << _join << " ";
+            }
+            if (_where) {
+                ss << _where->clause << " ";
+            }
+
+            serialize_limits(ss);
+
+            ss << ";";
+
+            ZXORM_GET_RESULT(Statement stmt, Statement::create(_handle, _logger, ss.str()));
 
             if (_where) {
                 ZXORM_TRY(_where->bind(stmt));
@@ -41,7 +68,7 @@ namespace zxorm {
         }
 
     public:
-        Query(query_type_t query_type, sqlite3* handle, Logger logger) : _query_type{query_type},  _handle(handle), _logger(logger) {}
+        Query(sqlite3* handle, Logger logger) : _handle(handle), _logger(logger) {}
 
         template <typename Expression>
         auto where(const Expression& e) {

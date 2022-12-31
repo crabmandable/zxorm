@@ -5,7 +5,6 @@
 #include "zxorm/error.hpp"
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
-#include "zxorm/orm/query_serializer.hpp"
 #include "zxorm/orm/expression.hpp"
 #include "zxorm/result.hpp"
 #include "zxorm/orm/field.hpp"
@@ -42,6 +41,9 @@ namespace zxorm {
 
         template<class T>
         auto make_select();
+
+        template<class T>
+        auto make_delete();
 
         auto make_statement(const std::string& query);
         auto exec(const std::string& query) -> OptionalError;
@@ -99,18 +101,16 @@ namespace zxorm {
             [[nodiscard]] OptionalResult<T> find_record(const PrimaryKeyType& id);
 
         template<class T, typename PrimaryKeyType>
-            OptionalError delete_record(const PrimaryKeyType& id);
-
-        template<class T, class Expression>
-            [[nodiscard]] auto where(const Expression& e) ->
-                Select<typename table_for_class<T>::type>;
-
-        template<class T, class Expression>
-            OptionalError delete_where(const Expression& e);
+            OptionalError remove_record(const PrimaryKeyType& id);
 
         template<class T>
-            [[nodiscard]] auto all() ->
+            [[nodiscard]] auto select() ->
                 Select<typename table_for_class<T>::type>;
+
+        template<class T>
+            [[nodiscard]] auto remove() ->
+                Delete<typename table_for_class<T>::type>;
+
 
         template<class T>
         [[nodiscard]] auto first();
@@ -194,6 +194,16 @@ namespace zxorm {
     auto Connection<Table...>::make_select()
     {
         return Select<T>(
+            _db_handle.get(),
+            _logger
+        );
+    }
+
+    template <class... Table>
+    template<class T>
+    auto Connection<Table...>::make_delete()
+    {
+        return Delete<T>(
             _db_handle.get(),
             _logger
         );
@@ -454,7 +464,7 @@ namespace zxorm {
 
     template <class... Table>
     template<class T, typename PrimaryKeyType>
-    OptionalError Connection<Table...>::delete_record(const PrimaryKeyType& id)
+    OptionalError Connection<Table...>::remove_record(const PrimaryKeyType& id)
     {
         using table_t = typename table_for_class<T>::type;
 
@@ -465,29 +475,21 @@ namespace zxorm {
         static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
-        return delete_where<T>(Field<table_t, primary_key_t::name>() == id);
-    }
-
-    template <class... Table>
-    template<class T, class Expression>
-    OptionalError Connection<Table...>::delete_where(const Expression& e)
-    {
-        using table_t = typename table_for_class<T>::type;
-        return Delete<table_t>(_db_handle.get(), _logger).where(e).exec();
-    }
-
-    template <class... Table>
-    template<class T, class Expression>
-    auto Connection<Table...>::where(const Expression& e) ->
-        Select<typename table_for_class<T>::type>
-    {
-        using table_t = typename table_for_class<T>::type;
-        return make_select<table_t>().where(e);
+        return make_delete<table_t>().where(Field<table_t, primary_key_t::name>() == id).exec();
     }
 
     template <class... Table>
     template<class T>
-    auto Connection<Table...>::all() ->
+    auto Connection<Table...>::remove() ->
+        Delete<typename table_for_class<T>::type>
+    {
+        using table_t = typename table_for_class<T>::type;
+        return make_delete<table_t>();
+    }
+
+    template <class... Table>
+    template<class T>
+    auto Connection<Table...>::select() ->
         Select<typename table_for_class<T>::type>
     {
         using table_t = typename table_for_class<T>::type;

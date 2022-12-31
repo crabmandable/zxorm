@@ -5,13 +5,21 @@
 #include "zxorm/orm/query.hpp"
 
 namespace zxorm {
+    namespace __delete_detail {
+        struct DeleteColumnClause {
+            friend std::ostream & operator<< (std::ostream &out, const DeleteColumnClause&) {
+                out << "DELETE ";
+                return out;
+            }
+        };
+    };
     template <class Table>
-    class Delete : public Query<Table> {
-    using Super = Query<Table>;
+    class Delete : public Query<Table, __delete_detail::DeleteColumnClause> {
+    using Super = Query<Table, __delete_detail::DeleteColumnClause>;
 
     public:
         Delete(sqlite3* handle, Logger logger) :
-            Super(query_type_t::DELETE, handle, logger) {}
+            Super(handle, logger) {}
 
         auto where(auto&&... args) {
             Super::where(std::forward<decltype(args)>(args)...);

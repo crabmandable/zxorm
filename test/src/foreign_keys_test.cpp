@@ -86,7 +86,7 @@ TEST_F(ForeignKeysTest, FindForeignColumn) {
 }
 
 TEST_F(ForeignKeysTest, JoinQueryReturningNothing) {
-    auto result = my_conn->all<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
+    auto result = my_conn->select<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -97,7 +97,7 @@ TEST_F(ForeignKeysTest, JoinQueryReturningNothing) {
     ASSERT_EQ(vec.value().size(), 0);
 
     // should be able to swap the params around and get the same query
-    result = my_conn->all<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
+    result = my_conn->select<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -121,7 +121,7 @@ TEST_F(ForeignKeysTest, JoinQueryReturningSomething) {
     err = my_conn->insert_many_records(obj2s);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->all<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
+    auto result = my_conn->select<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -132,7 +132,7 @@ TEST_F(ForeignKeysTest, JoinQueryReturningSomething) {
     ASSERT_EQ(vec.value().size(), 3);
 
     // should be able to swap the params around and get the same query
-    result = my_conn->all<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
+    result = my_conn->select<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -156,7 +156,10 @@ TEST_F(ForeignKeysTest, JoinWithWhere) {
     err = my_conn->insert_many_records(obj2s);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->where<Object1>(table2::field<"id"> == 1).join<table1::field<"id">, table2::field<"obj1_id">>().one();
+    auto result = my_conn->select<Object1>()
+        .where(table2::field<"id"> == 1)
+        .join<table1::field<"id">, table2::field<"obj1_id">>()
+        .one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -166,7 +169,7 @@ TEST_F(ForeignKeysTest, JoinWithWhere) {
 }
 
 TEST_F(ForeignKeysTest, JoinUsingFKConstraintReturnNothing) {
-    auto result = my_conn->all<Object2>().join<"obj1">().many();
+    auto result = my_conn->select<Object2>().join<"obj1">().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -190,7 +193,7 @@ TEST_F(ForeignKeysTest, JoinUsingFKConstraintReturnSomething) {
     err = my_conn->insert_many_records(obj2s);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->all<Object2>().join<"obj1">().many();
+    auto result = my_conn->select<Object2>().join<"obj1">().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
