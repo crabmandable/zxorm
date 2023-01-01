@@ -7,19 +7,27 @@
 
 namespace zxorm {
     namespace __select_detail {
-        template <typename Table>
+        template <typename From, typename... U>
         struct SelectColumnClause {
-            friend std::ostream & operator<< (std::ostream &out, const SelectColumnClause<Table>&) {
-                out << "SELECT `" << Table::name << "`.* ";
+            friend std::ostream & operator<< (std::ostream &out, const SelectColumnClause<From, U...>&) {
+                out << "SELECT ";
+                out << "`" << From::name << "`.* ";
+                    std::apply([&](const auto&... a) {
+                        ([&]() {
+                            using table_t = std::remove_reference_t<decltype(a)>;
+                            out << ", ";
+                            out << "`" << table_t::name << "`.* ";
+                         }(), ...);
+                    }, std::tuple<U...>{});
                 return out;
             }
         };
     };
 
-    template <class Table>
-    class Select : public Query<Table, __select_detail::SelectColumnClause<Table>> {
+    template <class From, class... U>
+    class Select : public Query<From, __select_detail::SelectColumnClause<From, U...>> {
     private:
-        using Super = Query<Table, __select_detail::SelectColumnClause<Table>>;
+        using Super = Query<From, __select_detail::SelectColumnClause<From, U...>>;
 
         std::string _limit_clause;
         std::string _order_clause;
@@ -58,7 +66,7 @@ namespace zxorm {
 
         template <FixedLengthString field>
         auto order_by(order_t ord) {
-            static_assert(not std::is_same_v<typename Table::column_by_name<field>::type, std::false_type>,
+            static_assert(not std::is_same_v<typename From::column_by_name<field>::type, std::false_type>,
                 "ORDER BY clause must use a field beloning to the Table"
             );
             std::stringstream ss;
@@ -67,7 +75,13 @@ namespace zxorm {
             return *this;
         }
 
-        OptionalResult<typename Table::object_class> one() {
+        // TODO: depending on the join type some of the tuple values could be null
+        auto one() -> OptionalResult<std::conditional_t<
+                (sizeof...(U) > 0),
+                std::tuple<typename From::object_class, typename U::object_class...>,
+                typename From::object_class
+            >>
+        {
             assert(_limit_clause.empty());
             limit(1);
             ZXORM_GET_RESULT(Statement s, Super::prepare());
@@ -75,15 +89,44 @@ namespace zxorm {
             if (s.done()) {
                 return std::nullopt;
             }
-            return Table::get_row(s);
+
+            if constexpr (sizeof...(U) == 0) {
+                return From::get_row(s);
+            } else {
+                ZXORM_GET_RESULT(auto f, From::get_row(s));
+
+                std::tuple<Result<typename U::object_class>...> us_res = { U::get_row(s)... };
+
+                OptionalResult<std::tuple<typename U::object_class...>> us = std::nullopt;
+
+                std::apply([&](const auto&... a) {
+                    // if an error is in here we should return it
+                    ([&]() {
+                        if (!us.is_error() && a.is_error()) {
+                            us = a.error();
+                        }
+                     }(), ...);
+
+                    // if there is no error, set the values
+                    if (!us.is_error()) {
+                        us = { a.value()... };
+                    }
+                }, us_res);
+
+                if (us.is_error()) {
+                    return us.error();
+                }
+
+                return std::tuple_cat(std::tuple<typename From::object_class>(f), us.value());
+            }
         }
 
-        Result<RecordIterator<Table>> many() {
+        Result<RecordIterator<From>> many() {
             auto s = Super::prepare();
             if (s.is_error()) {
                 return s.error();
             }
-            return RecordIterator<Table>(std::move(s.value()));
+            return RecordIterator<From>(std::move(s.value()));
         }
     };
 };

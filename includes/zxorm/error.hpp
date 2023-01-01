@@ -11,6 +11,8 @@
 
 namespace zxorm {
     struct Error {
+        Error() = default;
+
         Error(const char* const err, sqlite3* handle=nullptr) {
             if (handle)
                 sqlite_result = sqlite3_errcode(handle);

@@ -203,3 +203,23 @@ TEST_F(ForeignKeysTest, JoinUsingFKConstraintReturnSomething) {
     ASSERT_FALSE(vec.is_error());
     ASSERT_EQ(vec.value().size(), 3);
 }
+
+TEST_F(ForeignKeysTest, GetATupleUsingJoin) {
+    Object1 obj1;
+    auto err = my_conn->insert_record(obj1);
+    ASSERT_FALSE(err);
+
+    Object2 obj2 = {.obj1_id = obj1.id};
+    err = my_conn->insert_record(obj2);
+    ASSERT_FALSE(err);
+
+    auto result = my_conn->select<Object2, Object1>().join<"obj1">().one();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    Object2 obj2res = std::get<0>(result.value());
+    ASSERT_EQ(obj2res.id, obj2.id);
+    Object1 obj1res = std::get<1>(result.value());
+    ASSERT_EQ(obj1res.id, obj1.id);
+}

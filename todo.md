@@ -5,20 +5,23 @@ Note to self: start from top
 
     Test: delete with join
 
-    OUTER JOIN is currently useless, since the selected columns are not dynamic
+    Test joining many tables
 
-    `select` method should allow specifying more than one table to be returned
+    - Make the record iterator handle tuples (many)
 
-    `select` method should automatically generate the `join` clause if more
-    than one table is selected, and it is possible to determine the join based on
-    the foreign key
-    e.g
-    ```cpp
-    connection.select<FromTable, JoiningTable>().many();
-    ```
+    - Make outer/cross join work (need to make returned objects optional)
 
-    Also, the above should work for more than one join too (joining tables is variadic)
-    This means making the `join` clause on the `Query` a vector of clauses
+    - Prevent bad queries that result from selecting tables that aren't in the query
+
+    - `select` method should automatically generate the `join` clause if more
+      than one table is selected, and it is possible to determine the join based on
+      the foreign key
+        e.g
+        ```cpp
+        connection.select<FromTable, JoiningTable>().many();
+        ```
+
+    - Nested joins!
 
 * Allow using string names, or table classes instead of only objects for query methods
 

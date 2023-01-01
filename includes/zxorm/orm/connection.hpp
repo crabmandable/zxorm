@@ -31,15 +31,16 @@ namespace zxorm {
         Connection(sqlite3* db_handle, Logger logger);
 
         template<class C> struct table_for_class;
+
+        template <class C>
+        using table_for_class_t = typename table_for_class<C>::type;
+
         template<class C> static constexpr bool table_has_rowid();
 
         void log_error(const Error& err);
         inline void log_error(const OptionalError& err);
 
-        template<class T, class Expression>
-        auto make_select(const Expression& e);
-
-        template<class T>
+        template<class T, class... U>
         auto make_select();
 
         template<class T>
@@ -103,13 +104,13 @@ namespace zxorm {
         template<class T, typename PrimaryKeyType>
             OptionalError remove_record(const PrimaryKeyType& id);
 
-        template<class T>
+        template<class From, class... U>
             [[nodiscard]] auto select() ->
-                Select<typename table_for_class<T>::type>;
+                Select<table_for_class_t<From>, table_for_class_t<U>...>;
 
-        template<class T>
+        template<class From>
             [[nodiscard]] auto remove() ->
-                Delete<typename table_for_class<T>::type>;
+                Delete<table_for_class_t<From>>;
 
 
         template<class T>
@@ -184,16 +185,16 @@ namespace zxorm {
     template<class C>
     constexpr bool Connection<Table...>::table_has_rowid()
     {
-        using table_t = typename table_for_class<C>::type;
+        using table_t = table_for_class_t<C>;
         if (!table_t::has_primary_key) return false;
         return table_t::primary_key_t::sql_column_type == sqlite_column_type::INTEGER;
     }
 
     template <class... Table>
-    template<class T>
+    template<class T, class... U>
     auto Connection<Table...>::make_select()
     {
-        return Select<T>(
+        return Select<T, U...>(
             _db_handle.get(),
             _logger
         );
@@ -259,7 +260,7 @@ namespace zxorm {
     template<class T>
     OptionalError Connection<Table...>::update_record (const T& record)
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
         static_assert(table_t::has_primary_key, "Cannot execute an update on a table without a primary key");
 
         auto& pk = table_t::primary_key_t::getter(record);
@@ -306,7 +307,7 @@ namespace zxorm {
     template<typename T, IndexableContainer<T> Container>
     OptionalError Connection<Table...>::insert_many_records (const Container& records, size_t batch_size)
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
         return transaction([&]() -> OptionalError {
             size_t inserted = 0;
             // this error should always be overwritten
@@ -374,7 +375,7 @@ namespace zxorm {
     OptionalError Connection<Table...>::insert_record_impl (
         std::conditional_t<table_has_rowid<T>(), T&, const T&> record)
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
 
         auto query = table_t::insert_query();
         ZXORM_GET_RESULT(Statement insert_stmt, make_statement(query));
@@ -449,7 +450,7 @@ namespace zxorm {
     template<class T, typename PrimaryKeyType>
     OptionalResult<T> Connection<Table...>::find_record(const PrimaryKeyType& id)
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
 
         static_assert(table_t::has_primary_key, "Cannot execute a find on a table without a primary key");
 
@@ -466,7 +467,7 @@ namespace zxorm {
     template<class T, typename PrimaryKeyType>
     OptionalError Connection<Table...>::remove_record(const PrimaryKeyType& id)
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
 
         static_assert(table_t::has_primary_key, "Cannot execute a delete on a table without a primary key");
 
@@ -479,28 +480,28 @@ namespace zxorm {
     }
 
     template <class... Table>
-    template<class T>
+    template<class From>
     auto Connection<Table...>::remove() ->
-        Delete<typename table_for_class<T>::type>
+        Delete<table_for_class_t<From>>
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<From>;
         return make_delete<table_t>();
     }
 
     template <class... Table>
-    template<class T>
+    template<class From, class... U>
     auto Connection<Table...>::select() ->
-        Select<typename table_for_class<T>::type>
+        Select<table_for_class_t<From>, table_for_class_t<U>...>
     {
-        using table_t = typename table_for_class<T>::type;
-        return make_select<table_t>();
+        using table_t = table_for_class_t<From>;
+        return make_select<table_t, table_for_class_t<U>...>();
     }
 
     template <class... Table>
     template<class T>
     auto Connection<Table...>::first()
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
         return make_select<table_t>().one();
     }
 
@@ -508,7 +509,7 @@ namespace zxorm {
     template<class T>
     auto Connection<Table...>::last()
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
         constexpr auto pk_name = table_t::primary_key_t::name;
         return make_select<table_t>().template order_by<pk_name>(order_t::DESC).one();
     }
@@ -517,7 +518,7 @@ namespace zxorm {
     template<class T>
     OptionalError Connection<Table...>::truncate()
     {
-        using table_t = typename table_for_class<T>::type;
+        using table_t = table_for_class_t<T>;
 
         ZXORM_GET_RESULT(
             auto stmt,

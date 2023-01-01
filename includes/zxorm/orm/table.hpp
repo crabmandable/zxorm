@@ -219,7 +219,7 @@ class Table {
 
         static Result<T> get_row(Statement& stmt)
         {
-            if (stmt.column_count() != n_columns) {
+            if (stmt.column_count() < n_columns) {
                 return Error("Unexpected number of columns returned by query,"
                         " tables may not be synced");
             }
