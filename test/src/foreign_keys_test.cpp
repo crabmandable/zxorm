@@ -209,17 +209,22 @@ TEST_F(ForeignKeysTest, GetATupleUsingJoin) {
     auto err = my_conn->insert_record(obj1);
     ASSERT_FALSE(err);
 
-    Object2 obj2 = {.obj1_id = obj1.id};
-    err = my_conn->insert_record(obj2);
+    Object2 obj2_1 = {.obj1_id = obj1.id};
+    Object2 obj2_2 = {.obj1_id = obj1.id};
+    err = my_conn->insert_record(obj2_1);
+    ASSERT_FALSE(err);
+    err = my_conn->insert_record(obj2_2);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Object2, Object1>().join<"obj1">().one();
+    auto result = my_conn->select<Object2, Object1>().join<"obj1">().where(table2::field<"id"> == obj2_2.id).one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
     Object2 obj2res = std::get<0>(result.value());
-    ASSERT_EQ(obj2res.id, obj2.id);
+    ASSERT_EQ(obj2res.id, obj2_2.id);
+    ASSERT_EQ(obj2res.obj1_id, obj1.id);
+
     Object1 obj1res = std::get<1>(result.value());
     ASSERT_EQ(obj1res.id, obj1.id);
 }

@@ -22,6 +22,43 @@ namespace zxorm {
                 return out;
             }
         };
+
+        template <typename T, size_t s>
+        struct ColumnOffset{
+            using type = T;
+            static constexpr size_t offset = s;
+        };
+
+
+        template <size_t idx, typename... Ts>
+        struct find_offset {
+        private:
+            static constexpr std::array<size_t, sizeof...(Ts)> _n_columns = { Ts::n_columns... };
+
+            static constexpr size_t _sum (size_t i = 0U)
+            {
+                if (i > idx || i >= sizeof...(Ts)) {
+                    return 0;
+                }
+                return _n_columns[i] + _sum(i+1U);
+            }
+
+        public:
+            static constexpr size_t value = _sum() - 1;
+        };
+
+        template<typename Target, typename ListHead, typename... ListTails>
+        constexpr size_t find_index_of_type()
+        {
+            if constexpr (std::is_same<Target, ListHead>::value)
+                return 0;
+            else
+                return 1 + find_index_of_type<Target, ListTails...>();
+        };
+
+        template <typename... Ts>
+        using with_offsets  = std::tuple<ColumnOffset<Ts, find_offset<find_index_of_type<Ts, Ts...>(), Ts...>::value>...>;
+
     };
 
     template <class From, class... U>
@@ -95,7 +132,20 @@ namespace zxorm {
             } else {
                 ZXORM_GET_RESULT(auto f, From::get_row(s));
 
-                std::tuple<Result<typename U::object_class>...> us_res = { U::get_row(s)... };
+                // abusing optional because I don't want to initizlize this inside the lambda below
+                std::optional<std::tuple<Result<typename U::object_class>...>> us_res;
+
+                std::apply([&](const auto&... a) {
+                    us_res = {
+                        ([&]() {
+                            using pair = std::remove_reference_t<decltype(a)>;
+                            using table_t = pair::type;
+                            constexpr size_t offset = From::n_columns + pair::offset;
+                            return table_t::get_row(s, offset);
+                        }(), ...)
+                    };
+                }, __select_detail::with_offsets<U...>{});
+
 
                 OptionalResult<std::tuple<typename U::object_class...>> us = std::nullopt;
 
@@ -111,7 +161,7 @@ namespace zxorm {
                     if (!us.is_error()) {
                         us = { a.value()... };
                     }
-                }, us_res);
+                }, us_res.value());
 
                 if (us.is_error()) {
                     return us.error();

@@ -217,15 +217,15 @@ class Table {
             return str + " WHERE `" + primary_key_t::name.value + "` = ?;";
         }
 
-        static Result<T> get_row(Statement& stmt)
+        static Result<T> get_row(Statement& stmt, size_t column_offset = 0)
         {
-            if (stmt.column_count() < n_columns) {
+            if (stmt.column_count() - column_offset < n_columns) {
                 return Error("Unexpected number of columns returned by query,"
                         " tables may not be synced");
             }
 
             T record;
-            size_t column_idx = 0;
+            size_t column_idx = column_offset;
             OptionalError err;
             std::apply([&](const auto&... a) {
                 ([&]() {
