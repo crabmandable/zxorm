@@ -8,6 +8,7 @@ using namespace zxorm;
 
 struct Object1 {
     int id = 0;
+    std::optional<std::string> text;
 };
 
 struct Object2 {
@@ -26,7 +27,9 @@ struct Object4 {
     int both = 0;
 };
 
-using table1 = Table<"obj1", Object1, Column<"id", &Object1::id, PrimaryKey<>>>;
+using table1 = Table<"obj1", Object1,
+      Column<"id", &Object1::id, PrimaryKey<>>,
+      Column<"text", &Object1::text>>;
 
 using table2 = Table<"obj2", Object2,
     Column<"id", &Object2::id, PrimaryKey<>>,
@@ -205,7 +208,7 @@ TEST_F(ForeignKeysTest, JoinUsingFKConstraintReturnSomething) {
 }
 
 TEST_F(ForeignKeysTest, GetATupleUsingJoin) {
-    Object1 obj1;
+    Object1 obj1 = {.text = "sup"};
     auto err = my_conn->insert_record(obj1);
     ASSERT_FALSE(err);
 
@@ -227,4 +230,41 @@ TEST_F(ForeignKeysTest, GetATupleUsingJoin) {
 
     Object1 obj1res = std::get<1>(result.value());
     ASSERT_EQ(obj1res.id, obj1.id);
+    ASSERT_STREQ(obj1res.text.value().c_str(), "sup");
+}
+
+TEST_F(ForeignKeysTest, GetManyTupleUsingJoin) {
+    auto test_text = "hello there";
+    Object1 obj1 = {.text = test_text};
+    auto err = my_conn->insert_record(obj1);
+    ASSERT_FALSE(err);
+
+    Object2 obj2_1 = {.obj1_id = obj1.id};
+    Object2 obj2_2 = {.obj1_id = obj1.id};
+    Object2 obj2_3 = {.obj1_id = obj1.id};
+    err = my_conn->insert_record(obj2_1);
+    ASSERT_FALSE(err);
+    err = my_conn->insert_record(obj2_2);
+    ASSERT_FALSE(err);
+    err = my_conn->insert_record(obj2_3);
+    ASSERT_FALSE(err);
+
+    auto results = my_conn->select<Object2, Object1>().join<"obj1">().many();
+
+    if (results.is_error()) std::cout << results.error() << std::endl;
+    ASSERT_FALSE(results.is_error());
+
+    size_t i = 1;
+    for (const auto& row: results.value()) {
+        if (row.is_error()) std::cout << row.error() << std::endl;
+        ASSERT_FALSE(row.is_error());
+        Object2 obj2res = std::get<0>(row.value());
+        ASSERT_EQ(obj2res.id, i++);
+        ASSERT_EQ(obj2res.obj1_id, obj1.id);
+
+        Object1 obj1res = std::get<1>(row.value());
+        ASSERT_EQ(obj1res.id, obj1.id);
+        ASSERT_STREQ(obj1res.text.value().c_str(), test_text);
+    }
+    ASSERT_EQ(i, 4);
 }

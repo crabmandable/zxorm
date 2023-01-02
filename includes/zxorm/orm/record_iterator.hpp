@@ -4,25 +4,32 @@
 #include "zxorm/result.hpp"
 
 namespace zxorm {
-    template <typename Table>
+    template <typename From, typename... U>
     class RecordIterator
     {
     private:
-        using record_t = Table::object_class;
+        using return_t = std::conditional_t<(sizeof...(U) > 0),
+              std::tuple<typename From::object_class, typename U::object_class...>,
+              typename From::object_class
+            >;
+        using result_t = Result<return_t>;
+        using row_reader_t = std::function<result_t(Statement&)>;
         Statement _stmt;
+        row_reader_t _row_reader;
     public:
-        RecordIterator(Statement&& stmt) : _stmt{std::move(stmt)} { }
+        RecordIterator(Statement&& stmt,  row_reader_t row_reader) :
+            _stmt{std::move(stmt)}, _row_reader{row_reader} { }
 
         class iterator
         {
         private:
             Statement* _stmt = nullptr;
-            Result<record_t> _current = Error("No result");
+            row_reader_t _row_reader;
+            result_t _current = Error("No result");
         public:
-            using value_type = Result<record_t>;
             using iterator_category = std::input_iterator_tag;
 
-            iterator(Statement& stmt): _stmt{&stmt} {
+            iterator(Statement& stmt, row_reader_t row_reader): _stmt{&stmt}, _row_reader{row_reader} {
                 ++(*this);
             }
             iterator() = default;
@@ -35,12 +42,12 @@ namespace zxorm {
                 if (err) {
                     _current = err.value();
                 } else if (!_stmt->done()) {
-                    _current = Table::get_row(*_stmt);
+                    _current = _row_reader(*_stmt);
                 }
                 return *this;
             }
 
-            Result<record_t>& operator*() {
+            result_t& operator*() {
                 return _current;
             }
             bool operator==(const iterator& other) const {
@@ -64,15 +71,15 @@ namespace zxorm {
                 return iterator();
             }
 
-            return iterator(_stmt);
+            return iterator(_stmt, _row_reader);
         }
         iterator end() {
             return iterator();
         }
 
-        Result<std::vector<record_t>> to_vector() {
-            std::vector<record_t> records;
-            for(Result<record_t>& result: *this) {
+        Result<std::vector<return_t>> to_vector() {
+            std::vector<return_t> records;
+            for(auto& result: *this) {
                 if (result.is_error()) {
                     return result.error();
                 }

@@ -37,14 +37,14 @@ namespace zxorm {
 
             static constexpr size_t _sum (size_t i = 0U)
             {
-                if (i > idx || i >= sizeof...(Ts)) {
+                if (i >= idx || i >= sizeof...(Ts)) {
                     return 0;
                 }
                 return _n_columns[i] + _sum(i+1U);
             }
 
         public:
-            static constexpr size_t value = _sum() - 1;
+            static constexpr size_t value = _sum();
         };
 
         template<typename Target, typename ListHead, typename... ListTails>
@@ -71,6 +71,56 @@ namespace zxorm {
 
         virtual void serialize_limits(std::ostream& ss) override {
             ss << _order_clause << " " << _limit_clause;
+        }
+
+        static auto read_row(Statement& s) -> Result<std::conditional_t<
+                (sizeof...(U) > 0),
+                std::tuple<typename From::object_class, typename U::object_class...>,
+                typename From::object_class
+            >>
+        {
+            if constexpr (sizeof...(U) == 0) {
+                return From::get_row(s);
+            } else {
+                ZXORM_GET_RESULT(auto f, From::get_row(s));
+
+                // abusing optional because I don't want to initizlize this inside the lambda below
+                std::optional<std::tuple<Result<typename U::object_class>...>> us_res;
+
+                std::apply([&](const auto&... a) {
+                    us_res = {
+                        ([&]() {
+                            using pair = std::remove_reference_t<decltype(a)>;
+                            using table_t = pair::type;
+                            constexpr size_t offset = From::n_columns + pair::offset;
+                            return table_t::get_row(s, offset);
+                        }(), ...)
+                    };
+                }, __select_detail::with_offsets<U...>{});
+
+
+                OptionalResult<std::tuple<typename U::object_class...>> us = std::nullopt;
+
+                std::apply([&](const auto&... a) {
+                    // if an error is in here we should return it
+                    ([&]() {
+                        if (!us.is_error() && a.is_error()) {
+                            us = a.error();
+                        }
+                     }(), ...);
+
+                    // if there is no error, set the values
+                    if (!us.is_error()) {
+                        us = { a.value()... };
+                    }
+                }, us_res.value());
+
+                if (us.is_error()) {
+                    return us.error();
+                }
+
+                return std::tuple_cat(std::tuple<typename From::object_class>(f), us.value());
+            }
         }
 
     public:
@@ -127,56 +177,15 @@ namespace zxorm {
                 return std::nullopt;
             }
 
-            if constexpr (sizeof...(U) == 0) {
-                return From::get_row(s);
-            } else {
-                ZXORM_GET_RESULT(auto f, From::get_row(s));
-
-                // abusing optional because I don't want to initizlize this inside the lambda below
-                std::optional<std::tuple<Result<typename U::object_class>...>> us_res;
-
-                std::apply([&](const auto&... a) {
-                    us_res = {
-                        ([&]() {
-                            using pair = std::remove_reference_t<decltype(a)>;
-                            using table_t = pair::type;
-                            constexpr size_t offset = From::n_columns + pair::offset;
-                            return table_t::get_row(s, offset);
-                        }(), ...)
-                    };
-                }, __select_detail::with_offsets<U...>{});
-
-
-                OptionalResult<std::tuple<typename U::object_class...>> us = std::nullopt;
-
-                std::apply([&](const auto&... a) {
-                    // if an error is in here we should return it
-                    ([&]() {
-                        if (!us.is_error() && a.is_error()) {
-                            us = a.error();
-                        }
-                     }(), ...);
-
-                    // if there is no error, set the values
-                    if (!us.is_error()) {
-                        us = { a.value()... };
-                    }
-                }, us_res.value());
-
-                if (us.is_error()) {
-                    return us.error();
-                }
-
-                return std::tuple_cat(std::tuple<typename From::object_class>(f), us.value());
-            }
+            return read_row(s);
         }
 
-        Result<RecordIterator<From>> many() {
+        Result<RecordIterator<From, U...>> many() {
             auto s = Super::prepare();
             if (s.is_error()) {
                 return s.error();
             }
-            return RecordIterator<From>(std::move(s.value()));
+            return RecordIterator<From, U...>(std::move(s.value()), read_row);
         }
     };
 };
