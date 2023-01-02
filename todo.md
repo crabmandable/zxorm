@@ -7,8 +7,6 @@ Note to self: start from top
 
     Test joining many tables
 
-    - Make the record iterator handle tuples (many)
-
     - Make outer/cross join work (need to make returned objects optional)
 
     - Prevent bad queries that result from selecting tables that aren't in the query

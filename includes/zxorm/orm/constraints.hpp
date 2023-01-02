@@ -98,6 +98,12 @@ namespace zxorm {
         }
     };
 
+    template <typename T>
+    struct constraint_is_default : std::false_type { };
+
+    template <FixedLengthString T>
+    struct constraint_is_default<Default<T>> : std::true_type { };
+
     template<FixedLengthString value>
     struct Collate {
         static std::string to_string() {
@@ -134,6 +140,12 @@ namespace zxorm {
 
     template<conflict_t on_conflict=conflict_t::abort>
     using NotNull = ConstraintWithConflictClause<"NOT NULL", on_conflict>;
+
+    template <typename T>
+    struct constraint_is_not_null : std::false_type {};
+
+    template <auto T>
+    struct constraint_is_not_null<NotNull<T>> : std::true_type {};
 
     template<conflict_t on_conflict=conflict_t::abort>
     using PrimaryKey = ConstraintWithConflictClause<"PRIMARY KEY", on_conflict>;

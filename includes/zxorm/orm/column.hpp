@@ -16,7 +16,22 @@ namespace zxorm {
         template <typename MemberT, typename... C>
         requires (not ignore_qualifiers::is_optional<MemberT>())
         struct constraints<MemberT, C...> {
-            using type = unique_tuple<NotNull<>, C...>;
+            using type = std::conditional_t<
+                // if the column is a non optional string, set a default empty string
+                // as long as it doesnt already have default, or a not null
+                ignore_qualifiers::is_string<MemberT>() &&
+                    not any_of<constraint_is_default<C>::value...> &&
+                    not any_of<constraint_is_not_null<C>::value...>,
+
+                unique_tuple<Default<"">, C...>,
+
+                // else if there is a default, don't insert a NOT NULL
+                std::conditional_t<any_of<constraint_is_default<C>::value...>,
+                    unique_tuple<C...>,
+                // otherwise since the field isn't optional, it shouldn't be null
+                    unique_tuple<NotNull<>, C...>
+                    >
+                >;
         };
 
         template <typename Constraint>

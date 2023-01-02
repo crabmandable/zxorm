@@ -8,7 +8,7 @@ using namespace zxorm;
 
 struct Object1 {
     int id = 0;
-    std::optional<std::string> text;
+    std::string text;
 };
 
 struct Object2 {
@@ -61,7 +61,7 @@ class ForeignKeysTest : public ::testing::Test {
 
     void TearDown() override {
         my_conn = nullptr;
-        std::filesystem::remove("test.db");
+        std::filesystem::rename("test.db", "test.db.old");
     }
 };
 
@@ -230,7 +230,7 @@ TEST_F(ForeignKeysTest, GetATupleUsingJoin) {
 
     Object1 obj1res = std::get<1>(result.value());
     ASSERT_EQ(obj1res.id, obj1.id);
-    ASSERT_STREQ(obj1res.text.value().c_str(), "sup");
+    ASSERT_STREQ(obj1res.text.c_str(), "sup");
 }
 
 TEST_F(ForeignKeysTest, GetManyTupleUsingJoin) {
@@ -264,7 +264,7 @@ TEST_F(ForeignKeysTest, GetManyTupleUsingJoin) {
 
         Object1 obj1res = std::get<1>(row.value());
         ASSERT_EQ(obj1res.id, obj1.id);
-        ASSERT_STREQ(obj1res.text.value().c_str(), test_text);
+        ASSERT_STREQ(obj1res.text.c_str(), test_text);
     }
     ASSERT_EQ(i, 4);
 }
