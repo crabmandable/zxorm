@@ -99,6 +99,7 @@ namespace zxorm {
         OptionalResult(const std::nullopt_t) : __base_t{(std::optional<T>) std::nullopt} {}
         OptionalResult(T r) : __base_t{std::move(r)} {}
         OptionalResult(Error r) : __base_t{std::move(r)} {}
+        OptionalResult(auto&&... args) : __base_t{T{std::forward<decltype(args)>(args)...}} {}
 
         OptionalResult (Result<T>&& result): __base_t{std::nullopt} {
             if (result.is_error()) {

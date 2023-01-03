@@ -84,17 +84,16 @@ namespace zxorm {
             } else {
                 ZXORM_GET_RESULT(auto f, From::get_row(s));
 
-                // abusing optional because I don't want to initizlize this inside the lambda below
-                std::optional<std::tuple<Result<typename U::object_class>...>> us_res;
+                auto us_res = std::apply([&](const auto&... a) {
+                    auto get_row = [&](const auto& pair) {
+                        using pair_t = std::remove_reference_t<decltype(pair)>;
+                        using table_t = pair_t::type;
+                        constexpr size_t offset = From::n_columns + pair_t::offset;
+                        return table_t::get_row(s, offset);
+                    };
 
-                std::apply([&](const auto&... a) {
-                    us_res = {
-                        ([&]() {
-                            using pair = std::remove_reference_t<decltype(a)>;
-                            using table_t = pair::type;
-                            constexpr size_t offset = From::n_columns + pair::offset;
-                            return table_t::get_row(s, offset);
-                        }(), ...)
+                    return std::tuple<Result<typename U::object_class>...>{
+                        get_row(a)...
                     };
                 }, __select_detail::with_offsets<U...>{});
 
@@ -113,13 +112,13 @@ namespace zxorm {
                     if (!us.is_error()) {
                         us = { a.value()... };
                     }
-                }, us_res.value());
+                }, us_res);
 
                 if (us.is_error()) {
                     return us.error();
                 }
 
-                return std::tuple_cat(std::tuple<typename From::object_class>(f), us.value());
+                return std::tuple_cat(std::tuple(f), us.value());
             }
         }
 

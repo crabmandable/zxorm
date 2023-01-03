@@ -35,7 +35,7 @@ namespace zxorm {
         const char* _table_name = Table::name;
         sqlite3* _handle;
         Logger _logger;
-        std::string _join;
+        std::vector<std::string> _join;
         std::shared_ptr<ClauseBase> _where;
 
         // TODO: this is werid, think of a better way
@@ -48,7 +48,8 @@ namespace zxorm {
             ss << "FROM `" << _table_name << "` ";
 
             if (not _join.empty()) {
-                ss << _join << " ";
+                for (const auto& j: _join)
+                    ss << j << " ";
             }
             if (_where) {
                 ss << _where->clause << " ";
@@ -88,7 +89,8 @@ namespace zxorm {
             ss << type << "`" << foreign_key_t::table_name.value << "`"
                 << " ON `" << _table_name << "`.`" << select_column::name.value << "`"
                 << " = `" << foreign_key_t::table_name.value << "`.`" << foreign_key_t::column_name.value << "`";
-            _join =  ss.str();
+
+            _join.push_back(ss.str());
 
             return *this;
         }
@@ -116,9 +118,9 @@ namespace zxorm {
             };
 
             if constexpr (std::is_same_v<table_a_t, Table>) {
-                _join = serialize(table_b_t::name, field_b_t::name, field_a_t::name);
+                _join.push_back(serialize(table_b_t::name, field_b_t::name, field_a_t::name));
             } else {
-                _join = serialize(table_a_t::name, field_a_t::name, field_b_t::name);
+                _join.push_back(serialize(table_a_t::name, field_a_t::name, field_b_t::name));
             }
 
             return *this;
