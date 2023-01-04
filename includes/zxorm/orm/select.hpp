@@ -56,15 +56,29 @@ namespace zxorm {
                 return 1 + find_index_of_type<Target, ListTails...>();
         };
 
-        template <typename... Ts>
-        using with_offsets  = std::tuple<ColumnOffset<Ts, find_offset<find_index_of_type<Ts, Ts...>(), Ts...>::value>...>;
+        // unused base case
+        template <typename T>
+        struct with_offsets : std::false_type {};
 
+        template <typename... T>
+        struct with_offsets <std::tuple<T...>> {
+            template <typename Needle, typename... Haystack>
+            struct elem : std::type_identity<
+                ColumnOffset<Needle, find_offset<find_index_of_type<Needle, Haystack...>(), Haystack...>::value>
+            > { };
+
+            using type = std::tuple<typename elem<T, T...>::type...>;
+        };
+
+        template <typename T>
+        using with_offsets_t = typename with_offsets<T>::type;
     };
 
-    template <class From, class... U>
-    class Select : public Query<From, __select_detail::SelectColumnClause<From, U...>> {
+    template <class From, typename SelectedTablesTuple, typename ColumnClause, typename... JoinedTables>
+    class Select : public Query<From, ColumnClause, JoinedTables...> {
     private:
-        using Super = Query<From, __select_detail::SelectColumnClause<From, U...>>;
+        using Super = Query<From, ColumnClause, JoinedTables...>;
+        static constexpr bool is_multi_table_select = std::tuple_size_v<SelectedTablesTuple> > 1;
 
         std::string _limit_clause;
         std::string _order_clause;
@@ -73,32 +87,56 @@ namespace zxorm {
             ss << _order_clause << " " << _limit_clause;
         }
 
-        static auto read_row(Statement& s) -> Result<std::conditional_t<
-                (sizeof...(U) > 0),
-                std::tuple<typename From::object_class, typename U::object_class...>,
-                typename From::object_class
-            >>
+        // unused base case
+        template <typename T>
+        struct tuple_return : std::false_type {};
+
+        template <typename... T>
+        struct tuple_return <std::tuple<T...>> : std::type_identity<
+            std::tuple<typename T::object_class...>
+        > {};
+
+        template <typename T>
+        using tuple_return_t = typename tuple_return<T>::type;
+
+        using return_t = std::conditional_t<
+            is_multi_table_select,
+            tuple_return_t<SelectedTablesTuple>,
+            typename From::object_class
+        >;
+
+        // unused base case
+        template <typename T>
+        struct result_tuple : std::false_type {};
+
+        template <typename... T>
+        struct result_tuple <std::tuple<T...>> : std::type_identity<
+            std::tuple<Result<typename T::object_class>...>
+        > {};
+
+        using result_tuple_t = typename result_tuple<SelectedTablesTuple>::type;
+
+        static auto read_row(Statement& s) -> Result<return_t>
         {
-            if constexpr (sizeof...(U) == 0) {
+            if constexpr (!is_multi_table_select) {
                 return From::get_row(s);
             } else {
-                ZXORM_GET_RESULT(auto f, From::get_row(s));
-
                 auto us_res = std::apply([&](const auto&... a) {
                     auto get_row = [&](const auto& pair) {
                         using pair_t = std::remove_reference_t<decltype(pair)>;
                         using table_t = pair_t::type;
-                        constexpr size_t offset = From::n_columns + pair_t::offset;
+                        constexpr size_t offset = pair_t::offset;
                         return table_t::get_row(s, offset);
                     };
 
-                    return std::tuple<Result<typename U::object_class>...>{
+
+                    return result_tuple_t {
                         get_row(a)...
                     };
-                }, __select_detail::with_offsets<U...>{});
+                }, __select_detail::with_offsets_t<SelectedTablesTuple>{});
 
 
-                OptionalResult<std::tuple<typename U::object_class...>> us = std::nullopt;
+                OptionalResult<return_t> us = std::nullopt;
 
                 std::apply([&](const auto&... a) {
                     // if an error is in here we should return it
@@ -118,7 +156,7 @@ namespace zxorm {
                     return us.error();
                 }
 
-                return std::tuple_cat(std::tuple(f), us.value());
+                return us.value();
             }
         }
 
@@ -161,12 +199,7 @@ namespace zxorm {
             return *this;
         }
 
-        // TODO: depending on the join type some of the tuple values could be null
-        auto one() -> OptionalResult<std::conditional_t<
-                (sizeof...(U) > 0),
-                std::tuple<typename From::object_class, typename U::object_class...>,
-                typename From::object_class
-            >>
+        auto one() -> OptionalResult<return_t>
         {
             assert(_limit_clause.empty());
             limit(1);
@@ -179,12 +212,12 @@ namespace zxorm {
             return read_row(s);
         }
 
-        Result<RecordIterator<From, U...>> many() {
+        Result<RecordIterator<return_t>> many() {
             auto s = Super::prepare();
             if (s.is_error()) {
                 return s.error();
             }
-            return RecordIterator<From, U...>(std::move(s.value()), read_row);
+            return RecordIterator<return_t>(std::move(s.value()), read_row);
         }
     };
 };

@@ -302,6 +302,35 @@ TEST_F(ForeignKeysTest, MultipleJoins) {
     ASSERT_STREQ(obj1res.text.c_str(), test_text);
 }
 
-TEST_F(ForeignKeysTest, NestedJoin) {
-    // TODO
-}
+/* TEST_F(ForeignKeysTest, NestedJoin) { */
+/*     auto test_text = "hello there"; */
+/*     Object1 obj1 = {.text = test_text}; */
+/*     auto err = my_conn->insert_record(obj1); */
+/*     ASSERT_FALSE(err); */
+
+/*     Object2 obj2 = {.obj1_id = obj1.id}; */
+/*     err = my_conn->insert_record(obj2); */
+/*     ASSERT_FALSE(err); */
+
+/*     Object3 obj3 = {.obj1_id = obj1.id, .obj2_id = obj2.id}; */
+/*     err = my_conn->insert_record(obj3); */
+/*     ASSERT_FALSE(err); */
+
+/*     auto result = my_conn->select<Object3, Object2, Object1>().join<"obj2">().join<table2::field<"obj1_id">, table1::field<"id">>().one(); */
+
+/*     if (result.is_error()) std::cout << result.error() << std::endl; */
+/*     ASSERT_FALSE(result.is_error()); */
+
+/*     Object3 obj3res = std::get<0>(result.value()); */
+/*     ASSERT_EQ(obj3res.id, obj3.id); */
+/*     ASSERT_EQ(obj3res.obj2_id, obj2.id); */
+/*     ASSERT_EQ(obj3res.obj1_id, obj1.id); */
+
+/*     Object2 obj2res = std::get<1>(result.value()); */
+/*     ASSERT_EQ(obj2res.id, obj2.id); */
+/*     ASSERT_EQ(obj2res.obj1_id, obj1.id); */
+
+/*     Object1 obj1res = std::get<2>(result.value()); */
+/*     ASSERT_EQ(obj1res.id, obj1.id); */
+/*     ASSERT_STREQ(obj1res.text.c_str(), test_text); */
+/* } */

@@ -4,14 +4,10 @@
 #include "zxorm/result.hpp"
 
 namespace zxorm {
-    template <typename From, typename... U>
+    template <typename return_t>
     class RecordIterator
     {
     private:
-        using return_t = std::conditional_t<(sizeof...(U) > 0),
-              std::tuple<typename From::object_class, typename U::object_class...>,
-              typename From::object_class
-            >;
         using result_t = Result<return_t>;
         using row_reader_t = std::function<result_t(Statement&)>;
         Statement _stmt;

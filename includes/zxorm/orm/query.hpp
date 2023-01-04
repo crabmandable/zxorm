@@ -29,7 +29,7 @@ namespace zxorm {
         return out;
     };
 
-    template <typename Table, typename ColumnClause>
+    template <typename Table, typename ColumnClause, typename... JoinedTables>
     class Query {
     protected:
         const char* _table_name = Table::name;
@@ -102,8 +102,10 @@ namespace zxorm {
             using table_a_t = typename field_a_t::table_t;
             using table_b_t = typename field_b_t::table_t;
 
-            static_assert(std::is_same_v<table_a_t, Table> || std::is_same_v<table_b_t, Table>,
-                    "One of the join fields should belong to the table being queried");
+            static_assert(std::is_same_v<table_a_t, Table> || std::is_same_v<table_b_t, Table> ||
+                    any_of<std::is_same_v<table_a_t, JoinedTables>...> || any_of<std::is_same_v<table_b_t, JoinedTables>...>,
+                    "One of the join fields should belong to the table being queried, "
+                    "or another table already joined");
 
             // using this lambda to get arround the fact that we have a constexpr if
             // which means I can't just make the join_table, join_field and select_fields variables,

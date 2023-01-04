@@ -41,6 +41,12 @@ namespace zxorm {
         inline void log_error(const OptionalError& err);
 
         template<class T, class... U>
+        using select_t = Select<table_for_class_t<T>,
+                                std::tuple<table_for_class_t<T>,
+                                table_for_class_t<U>...>,
+                                __select_detail::SelectColumnClause<table_for_class_t<T>, table_for_class_t<U>...>>;
+
+        template<class T, class... U>
         auto make_select();
 
         template<class T>
@@ -105,8 +111,7 @@ namespace zxorm {
             OptionalError remove_record(const PrimaryKeyType& id);
 
         template<class From, class... U>
-            [[nodiscard]] auto select() ->
-                Select<table_for_class_t<From>, table_for_class_t<U>...>;
+            [[nodiscard]] auto select() -> select_t<From, U...>;
 
         template<class From>
             [[nodiscard]] auto remove() ->
@@ -176,7 +181,9 @@ namespace zxorm {
     template<class C>
     struct Connection<Table...>::table_for_class
     {
-        static constexpr int idx = index_of_first<std::is_same<C, typename Table::object_class>::value...>::value;
+        static constexpr int idx = index_of_first<
+            (std::is_same_v<C, typename Table::object_class> || std::is_same_v<C, Table>)...
+            >::value;
         static_assert(idx >= 0, "Connection does not contain any table matching the type T");
         using type = typename std::tuple_element<idx, std::tuple<Table...>>::type;
     };
@@ -190,11 +197,12 @@ namespace zxorm {
         return table_t::primary_key_t::sql_column_type == sqlite_column_type::INTEGER;
     }
 
+
     template <class... Table>
     template<class T, class... U>
     auto Connection<Table...>::make_select()
     {
-        return Select<T, U...>(
+        return select_t<T, U...>(
             _db_handle.get(),
             _logger
         );
@@ -460,7 +468,7 @@ namespace zxorm {
                 "Primary key type does not match the type specified in the definition of the table");
 
         auto e = Field<table_t, primary_key_t::name>() == id;
-        return make_select<table_t>().where(e).one();
+        return make_select<T>().where(e).one();
     }
 
     template <class... Table>
@@ -490,19 +498,16 @@ namespace zxorm {
 
     template <class... Table>
     template<class From, class... U>
-    auto Connection<Table...>::select() ->
-        Select<table_for_class_t<From>, table_for_class_t<U>...>
+    auto Connection<Table...>::select() -> select_t<From, U...>
     {
-        using table_t = table_for_class_t<From>;
-        return make_select<table_t, table_for_class_t<U>...>();
+        return make_select<From, U...>();
     }
 
     template <class... Table>
     template<class T>
     auto Connection<Table...>::first()
     {
-        using table_t = table_for_class_t<T>;
-        return make_select<table_t>().one();
+        return make_select<T>().one();
     }
 
     template <class... Table>
@@ -511,7 +516,7 @@ namespace zxorm {
     {
         using table_t = table_for_class_t<T>;
         constexpr auto pk_name = table_t::primary_key_t::name;
-        return make_select<table_t>().template order_by<pk_name>(order_t::DESC).one();
+        return make_select<T>().template order_by<pk_name>(order_t::DESC).one();
     }
 
     template <class... Table>
