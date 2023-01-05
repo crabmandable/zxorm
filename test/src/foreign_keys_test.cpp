@@ -219,7 +219,7 @@ TEST_F(ForeignKeysTest, GetATupleUsingJoin) {
     err = my_conn->insert_record(obj2_2);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Object2, Object1>().join<"obj1">().where(table2::field<"id"> == obj2_2.id).one();
+    auto result = my_conn->select<Select<Object2, Object1>>().join<"obj1">().where(table2::field<"id"> == obj2_2.id).one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -249,7 +249,7 @@ TEST_F(ForeignKeysTest, GetManyTupleUsingJoin) {
     err = my_conn->insert_record(obj2_3);
     ASSERT_FALSE(err);
 
-    auto results = my_conn->select<Object2, Object1>().join<"obj1">().many();
+    auto results = my_conn->select<Select<Object2, Object1>>().join<"obj1">().many();
 
     if (results.is_error()) std::cout << results.error() << std::endl;
     ASSERT_FALSE(results.is_error());
@@ -283,7 +283,7 @@ TEST_F(ForeignKeysTest, MultipleJoins) {
     err = my_conn->insert_record(obj3);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Object3, Object2, Object1>().join<"obj2">().join<"obj1">().one();
+    auto result = my_conn->select<Select<Object3, Object2, Object1>>().join<"obj2">().join<"obj1">().one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -316,7 +316,7 @@ TEST_F(ForeignKeysTest, MultipleJoins) {
 /*     err = my_conn->insert_record(obj3); */
 /*     ASSERT_FALSE(err); */
 
-/*     auto result = my_conn->select<Object3, Object2, Object1>().join<"obj2">().join<table2::field<"obj1_id">, table1::field<"id">>().one(); */
+/*     auto result = my_conn->select<Select<Object3, Object2, Object1>>().join<"obj2">().join<table2::field<"obj1_id">, table1::field<"id">>().one(); */
 
 /*     if (result.is_error()) std::cout << result.error() << std::endl; */
 /*     ASSERT_FALSE(result.is_error()); */

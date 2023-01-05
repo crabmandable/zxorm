@@ -8,7 +8,7 @@
 #include "zxorm/orm/expression.hpp"
 #include "zxorm/result.hpp"
 #include "zxorm/orm/field.hpp"
-#include "zxorm/orm/select.hpp"
+#include "zxorm/orm/select_query.hpp"
 #include "zxorm/orm/delete.hpp"
 #include <functional>
 #include <sstream>
@@ -30,23 +30,17 @@ namespace zxorm {
 
         Connection(sqlite3* db_handle, Logger logger);
 
-        template<class C> struct table_for_class;
-
-        template <class C>
-        using table_for_class_t = typename table_for_class<C>::type;
+        template<class C> struct index_of_table;
 
         template<class C> static constexpr bool table_has_rowid();
+
+        template<typename T>
+        struct select_type;
 
         void log_error(const Error& err);
         inline void log_error(const OptionalError& err);
 
-        template<class T, class... U>
-        using select_t = Select<table_for_class_t<T>,
-                                std::tuple<table_for_class_t<T>,
-                                table_for_class_t<U>...>,
-                                __select_detail::SelectColumnClause<table_for_class_t<T>, table_for_class_t<U>...>>;
-
-        template<class T, class... U>
+        template<class SelectOrTable>
         auto make_select();
 
         template<class T>
@@ -62,6 +56,12 @@ namespace zxorm {
                     std::conditional_t<table_has_rowid<T>(), T&, const T&> record);
 
     public:
+
+        template<class C> struct table_for_class;
+
+        template <class C>
+        using table_for_class_t = typename table_for_class<C>::type;
+
         static Result<Connection<Table...>> create(
                 const char* file_name, int flags = 0, const char* z_vfs = nullptr, Logger logger = nullptr);
 
@@ -110,8 +110,8 @@ namespace zxorm {
         template<class T, typename PrimaryKeyType>
             OptionalError remove_record(const PrimaryKeyType& id);
 
-        template<class From, class... U>
-            [[nodiscard]] auto select() -> select_t<From, U...>;
+        template<class Select>
+            [[nodiscard]] auto select();
 
         template<class From>
             [[nodiscard]] auto remove() ->
@@ -179,13 +179,19 @@ namespace zxorm {
 
     template <class... Table>
     template<class C>
-    struct Connection<Table...>::table_for_class
+    struct Connection<Table...>::index_of_table
     {
-        static constexpr int idx = index_of_first<
+        static constexpr int value = index_of_first<
             (std::is_same_v<C, typename Table::object_class> || std::is_same_v<C, Table>)...
             >::value;
-        static_assert(idx >= 0, "Connection does not contain any table matching the type T");
-        using type = typename std::tuple_element<idx, std::tuple<Table...>>::type;
+    };
+
+    template <class... Table>
+    template<class C>
+    struct Connection<Table...>::table_for_class
+    {
+        static_assert(index_of_table<C>::value >= 0, "Connection does not contain any table matching the type T");
+        using type = typename std::tuple_element<index_of_table<C>::value, std::tuple<Table...>>::type;
     };
 
     template <class... Table>
@@ -199,10 +205,26 @@ namespace zxorm {
 
 
     template <class... Table>
-    template<class T, class... U>
+    template<typename T>
+    struct Connection<Table...>::select_type : std::type_identity<__select_impl<table_for_class_t<T>>> { };
+
+    template <class... Table>
+    template<typename From, typename... U>
+    struct Connection<Table...>::select_type<Select<From, U...>> : std::type_identity<
+        __select_impl<table_for_class_t<From>, table_for_class_t<U>...>
+    > { };
+
+    template <class... Table>
+    template<typename SelectOrTable>
     auto Connection<Table...>::make_select()
     {
-        return select_t<T, U...>(
+        static_assert(index_of_table<SelectOrTable>::value >= 0 || is_select_v<SelectOrTable>,
+                "Template argument for select queries should be a table to select, "
+                "or an `Select` template containing multiple tables");
+
+        using select_t = typename select_type<SelectOrTable>::type;
+
+        return SelectQuery<select_t>(
             _db_handle.get(),
             _logger
         );
@@ -497,10 +519,10 @@ namespace zxorm {
     }
 
     template <class... Table>
-    template<class From, class... U>
-    auto Connection<Table...>::select() -> select_t<From, U...>
+    template<typename Select>
+    auto Connection<Table...>::select()
     {
-        return make_select<From, U...>();
+        return make_select<Select>();
     }
 
     template <class... Table>

@@ -250,4 +250,13 @@ class Table {
         }
 };
 
+template <typename T>
+struct is_table : std::false_type {};
+
+template <FixedLengthString table_name, class T, class... Column>
+struct is_table<Table<table_name, T, Column...>> : std::true_type {};
+
+template <typename T>
+static constexpr bool is_table_v = is_table<T>::value;
+
 };

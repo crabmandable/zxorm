@@ -36,7 +36,7 @@ namespace zxorm {
         sqlite3* _handle;
         Logger _logger;
         std::vector<std::string> _join;
-        std::shared_ptr<ClauseBase> _where;
+        std::shared_ptr<BindingClauseBase> _where;
 
         // TODO: this is werid, think of a better way
         virtual void serialize_limits(std::ostream& ) {}

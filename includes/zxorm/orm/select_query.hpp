@@ -6,22 +6,18 @@
 #include "zxorm/orm/record_iterator.hpp"
 
 namespace zxorm {
-    namespace __select_detail {
-        template <typename From, typename... U>
-        struct SelectColumnClause {
-            friend std::ostream & operator<< (std::ostream &out, const SelectColumnClause<From, U...>&) {
-                out << "SELECT ";
-                out << "`" << From::name << "`.* ";
-                    std::apply([&](const auto&... a) {
-                        ([&]() {
-                            using table_t = std::remove_reference_t<decltype(a)>;
-                            out << ", ";
-                            out << "`" << table_t::name << "`.* ";
-                         }(), ...);
-                    }, std::tuple<U...>{});
-                return out;
-            }
-        };
+    template <typename Select, typename... JoinedTables>
+    class SelectQuery : public Query<typename Select::from_t, Select, JoinedTables...> {
+    private:
+        using Super = Query<typename Select::from_t, Select, JoinedTables...>;
+        static constexpr bool is_multi_table_select = std::tuple_size_v<typename Select::tables_t> > 1;
+
+        std::string _limit_clause;
+        std::string _order_clause;
+
+        virtual void serialize_limits(std::ostream& ss) override {
+            ss << _order_clause << " " << _limit_clause;
+        }
 
         template <typename T, size_t s>
         struct ColumnOffset{
@@ -48,13 +44,13 @@ namespace zxorm {
         };
 
         template<typename Target, typename ListHead, typename... ListTails>
-        constexpr size_t find_index_of_type()
+        static constexpr size_t find_index_of_type()
         {
             if constexpr (std::is_same<Target, ListHead>::value)
                 return 0;
             else
                 return 1 + find_index_of_type<Target, ListTails...>();
-        };
+        }
 
         // unused base case
         template <typename T>
@@ -72,20 +68,6 @@ namespace zxorm {
 
         template <typename T>
         using with_offsets_t = typename with_offsets<T>::type;
-    };
-
-    template <class From, typename SelectedTablesTuple, typename ColumnClause, typename... JoinedTables>
-    class Select : public Query<From, ColumnClause, JoinedTables...> {
-    private:
-        using Super = Query<From, ColumnClause, JoinedTables...>;
-        static constexpr bool is_multi_table_select = std::tuple_size_v<SelectedTablesTuple> > 1;
-
-        std::string _limit_clause;
-        std::string _order_clause;
-
-        virtual void serialize_limits(std::ostream& ss) override {
-            ss << _order_clause << " " << _limit_clause;
-        }
 
         // unused base case
         template <typename T>
@@ -101,8 +83,8 @@ namespace zxorm {
 
         using return_t = std::conditional_t<
             is_multi_table_select,
-            tuple_return_t<SelectedTablesTuple>,
-            typename From::object_class
+            tuple_return_t<typename Select::tables_t>,
+            typename Select::from_t::object_class
         >;
 
         // unused base case
@@ -114,12 +96,12 @@ namespace zxorm {
             std::tuple<Result<typename T::object_class>...>
         > {};
 
-        using result_tuple_t = typename result_tuple<SelectedTablesTuple>::type;
+        using result_tuple_t = typename result_tuple<typename Select::tables_t>::type;
 
         static auto read_row(Statement& s) -> Result<return_t>
         {
             if constexpr (!is_multi_table_select) {
-                return From::get_row(s);
+                return Select::from_t::get_row(s);
             } else {
                 auto us_res = std::apply([&](const auto&... a) {
                     auto get_row = [&](const auto& pair) {
@@ -133,7 +115,7 @@ namespace zxorm {
                     return result_tuple_t {
                         get_row(a)...
                     };
-                }, __select_detail::with_offsets_t<SelectedTablesTuple>{});
+                }, with_offsets_t<typename Select::tables_t>{});
 
 
                 OptionalResult<return_t> us = std::nullopt;
@@ -161,7 +143,7 @@ namespace zxorm {
         }
 
     public:
-        Select(sqlite3* handle, Logger logger) :
+        SelectQuery(sqlite3* handle, Logger logger) :
             Super(handle, logger) {}
 
         auto where(auto&&... args) {
@@ -190,7 +172,7 @@ namespace zxorm {
 
         template <FixedLengthString field>
         auto order_by(order_t ord) {
-            static_assert(not std::is_same_v<typename From::column_by_name<field>::type, std::false_type>,
+            static_assert(not std::is_same_v<typename Select::from_t::column_by_name<field>::type, std::false_type>,
                 "ORDER BY clause must use a field beloning to the Table"
             );
             std::stringstream ss;
