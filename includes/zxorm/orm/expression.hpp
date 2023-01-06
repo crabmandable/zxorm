@@ -117,7 +117,7 @@ namespace zxorm {
 
         std::string serialize() const {
             std::stringstream ss;
-            ss << "`" << Table::name << "`.`" << Column::name.value << "` " << op << " ?";
+            ss << "`" << Table::name.value << "`.`" << Column::name.value << "` " << op << " ?";
             return ss.str();
         }
 

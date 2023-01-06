@@ -6,10 +6,10 @@
 #include "zxorm/orm/record_iterator.hpp"
 
 namespace zxorm {
-    template <typename Select, typename... JoinedTables>
-    class SelectQuery : public Query<typename Select::from_t, Select, JoinedTables...> {
+    template <typename Select, typename... Joins>
+    class SelectQuery : public Query<typename Select::from_t, Select, Joins...> {
     private:
-        using Super = Query<typename Select::from_t, Select, JoinedTables...>;
+        using Super = Query<typename Select::from_t, Select, Joins...>;
         static constexpr bool is_multi_table_select = std::tuple_size_v<typename Select::tables_t> > 1;
 
         std::string _limit_clause;
@@ -148,18 +148,6 @@ namespace zxorm {
 
         auto where(auto&&... args) {
             Super::where(std::forward<decltype(args)>(args)...);
-            return *this;
-        }
-
-        template <Field field_a, Field field_b>
-        auto join(join_type_t type = join_type_t::INNER) {
-            Super::template join<field_a, field_b>(type);
-            return *this;
-        }
-
-        template <FixedLengthString foreign_table>
-        auto join(join_type_t type = join_type_t::INNER) {
-            Super::template join<foreign_table>(type);
             return *this;
         }
 

@@ -89,7 +89,9 @@ TEST_F(ForeignKeysTest, FindForeignColumn) {
 }
 
 TEST_F(ForeignKeysTest, JoinQueryReturningNothing) {
-    auto result = my_conn->select<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
+    auto result = my_conn->select_query<Object1,
+         JoinOn<table1::field<"id">, table2::field<"obj1_id">>
+    >().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -100,7 +102,7 @@ TEST_F(ForeignKeysTest, JoinQueryReturningNothing) {
     ASSERT_EQ(vec.value().size(), 0);
 
     // should be able to swap the params around and get the same query
-    result = my_conn->select<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
+    result = my_conn->select_query<Object1, JoinOn<table2::field<"obj1_id">, table1::field<"id">>>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -124,7 +126,7 @@ TEST_F(ForeignKeysTest, JoinQueryReturningSomething) {
     err = my_conn->insert_many_records(obj2s);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Object1>().join<table1::field<"id">, table2::field<"obj1_id">>().many();
+    auto result = my_conn->select_query<Object1, JoinOn<table1::field<"id">, table2::field<"obj1_id">>>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -135,7 +137,7 @@ TEST_F(ForeignKeysTest, JoinQueryReturningSomething) {
     ASSERT_EQ(vec.value().size(), 3);
 
     // should be able to swap the params around and get the same query
-    result = my_conn->select<Object1>().join<table2::field<"obj1_id">, table1::field<"id">>().many();
+    result = my_conn->select_query<Object1, JoinOn<table2::field<"obj1_id">, table1::field<"id">>>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -159,9 +161,8 @@ TEST_F(ForeignKeysTest, JoinWithWhere) {
     err = my_conn->insert_many_records(obj2s);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Object1>()
+    auto result = my_conn->select_query<Object1, JoinOn<table1::field<"id">, table2::field<"obj1_id">>>()
         .where(table2::field<"id"> == 1)
-        .join<table1::field<"id">, table2::field<"obj1_id">>()
         .one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
@@ -172,7 +173,8 @@ TEST_F(ForeignKeysTest, JoinWithWhere) {
 }
 
 TEST_F(ForeignKeysTest, JoinUsingFKConstraintReturnNothing) {
-    auto result = my_conn->select<Object2>().join<"obj1">().many();
+
+    auto result = my_conn->select_query<Object2, Join<Object1>>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -196,7 +198,7 @@ TEST_F(ForeignKeysTest, JoinUsingFKConstraintReturnSomething) {
     err = my_conn->insert_many_records(obj2s);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Object2>().join<"obj1">().many();
+    auto result = my_conn->select_query<Object2, Join<Object1>>().many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -219,7 +221,7 @@ TEST_F(ForeignKeysTest, GetATupleUsingJoin) {
     err = my_conn->insert_record(obj2_2);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Select<Object2, Object1>>().join<"obj1">().where(table2::field<"id"> == obj2_2.id).one();
+    auto result = my_conn->select_query<Select<Object2, Object1>, Join<Object1>>().where(table2::field<"id"> == obj2_2.id).one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -249,7 +251,7 @@ TEST_F(ForeignKeysTest, GetManyTupleUsingJoin) {
     err = my_conn->insert_record(obj2_3);
     ASSERT_FALSE(err);
 
-    auto results = my_conn->select<Select<Object2, Object1>>().join<"obj1">().many();
+    auto results = my_conn->select_query<Select<Object2, Object1>, Join<Object1>>().many();
 
     if (results.is_error()) std::cout << results.error() << std::endl;
     ASSERT_FALSE(results.is_error());
@@ -283,7 +285,11 @@ TEST_F(ForeignKeysTest, MultipleJoins) {
     err = my_conn->insert_record(obj3);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select<Select<Object3, Object2, Object1>>().join<"obj2">().join<"obj1">().one();
+    auto result = my_conn->select_query<
+        Select<Object3, Object2, Object1>,
+        Join<Object2>,
+        Join<Object1>
+    >().one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -302,35 +308,39 @@ TEST_F(ForeignKeysTest, MultipleJoins) {
     ASSERT_STREQ(obj1res.text.c_str(), test_text);
 }
 
-/* TEST_F(ForeignKeysTest, NestedJoin) { */
-/*     auto test_text = "hello there"; */
-/*     Object1 obj1 = {.text = test_text}; */
-/*     auto err = my_conn->insert_record(obj1); */
-/*     ASSERT_FALSE(err); */
+TEST_F(ForeignKeysTest, NestedJoin) {
+    auto test_text = "hello there";
+    Object1 obj1 = {.text = test_text};
+    auto err = my_conn->insert_record(obj1);
+    ASSERT_FALSE(err);
 
-/*     Object2 obj2 = {.obj1_id = obj1.id}; */
-/*     err = my_conn->insert_record(obj2); */
-/*     ASSERT_FALSE(err); */
+    Object2 obj2 = {.obj1_id = obj1.id};
+    err = my_conn->insert_record(obj2);
+    ASSERT_FALSE(err);
 
-/*     Object3 obj3 = {.obj1_id = obj1.id, .obj2_id = obj2.id}; */
-/*     err = my_conn->insert_record(obj3); */
-/*     ASSERT_FALSE(err); */
+    Object3 obj3 = {.obj1_id = obj1.id, .obj2_id = obj2.id};
+    err = my_conn->insert_record(obj3);
+    ASSERT_FALSE(err);
 
-/*     auto result = my_conn->select<Select<Object3, Object2, Object1>>().join<"obj2">().join<table2::field<"obj1_id">, table1::field<"id">>().one(); */
+    auto result = my_conn->select_query<
+        Select<Object3, Object2, Object1>,
+        Join<Object2>,
+        JoinOn<table2::field<"obj1_id">, table1::field<"id">>
+    >().one();
 
-/*     if (result.is_error()) std::cout << result.error() << std::endl; */
-/*     ASSERT_FALSE(result.is_error()); */
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
 
-/*     Object3 obj3res = std::get<0>(result.value()); */
-/*     ASSERT_EQ(obj3res.id, obj3.id); */
-/*     ASSERT_EQ(obj3res.obj2_id, obj2.id); */
-/*     ASSERT_EQ(obj3res.obj1_id, obj1.id); */
+    Object3 obj3res = std::get<0>(result.value());
+    ASSERT_EQ(obj3res.id, obj3.id);
+    ASSERT_EQ(obj3res.obj2_id, obj2.id);
+    ASSERT_EQ(obj3res.obj1_id, obj1.id);
 
-/*     Object2 obj2res = std::get<1>(result.value()); */
-/*     ASSERT_EQ(obj2res.id, obj2.id); */
-/*     ASSERT_EQ(obj2res.obj1_id, obj1.id); */
+    Object2 obj2res = std::get<1>(result.value());
+    ASSERT_EQ(obj2res.id, obj2.id);
+    ASSERT_EQ(obj2res.obj1_id, obj1.id);
 
-/*     Object1 obj1res = std::get<2>(result.value()); */
-/*     ASSERT_EQ(obj1res.id, obj1.id); */
-/*     ASSERT_STREQ(obj1res.text.c_str(), test_text); */
-/* } */
+    Object1 obj1res = std::get<2>(result.value());
+    ASSERT_EQ(obj1res.id, obj1.id);
+    ASSERT_STREQ(obj1res.text.c_str(), test_text);
+}

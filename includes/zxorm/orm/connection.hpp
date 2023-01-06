@@ -31,20 +31,30 @@ namespace zxorm {
         Connection(sqlite3* db_handle, Logger logger);
 
         template<class C> struct index_of_table;
+        template<FixedLengthString name> struct index_of_table_name;
 
         template<class C> static constexpr bool table_has_rowid();
 
         template<typename T>
         struct select_type;
 
+        template <typename T>
+        struct select_or_table_table;
+
+        template<typename T, typename OtherTablesTuple>
+        struct join_clause_type;
+
+        template <typename JoinedTables, typename JoinedClauses, typename Last, typename... T>
+        struct make_joins;
+
         void log_error(const Error& err);
         inline void log_error(const OptionalError& err);
 
-        template<class SelectOrTable>
-        auto make_select();
+        template<class SelectOrTable, class... Joins>
+        auto make_select_query();
 
         template<class T>
-        auto make_delete();
+        auto make_delete_query();
 
         auto make_statement(const std::string& query);
         auto exec(const std::string& query) -> OptionalError;
@@ -61,6 +71,12 @@ namespace zxorm {
 
         template <class C>
         using table_for_class_t = typename table_for_class<C>::type;
+
+        template<FixedLengthString name> struct table_for_name;
+
+        template <FixedLengthString name>
+        using table_for_name_t = typename table_for_name<name>::type;
+
 
         static Result<Connection<Table...>> create(
                 const char* file_name, int flags = 0, const char* z_vfs = nullptr, Logger logger = nullptr);
@@ -110,8 +126,8 @@ namespace zxorm {
         template<class T, typename PrimaryKeyType>
             OptionalError remove_record(const PrimaryKeyType& id);
 
-        template<class Select>
-            [[nodiscard]] auto select();
+        template<class Select, class... Joins>
+            [[nodiscard]] auto select_query();
 
         template<class From>
             [[nodiscard]] auto remove() ->
@@ -187,11 +203,27 @@ namespace zxorm {
     };
 
     template <class... Table>
+    template<FixedLengthString name>
+    struct Connection<Table...>::index_of_table_name
+    {
+        static constexpr int value = index_of_first<(name == Table::name)...>::value;
+    };
+
+    template <class... Table>
     template<class C>
     struct Connection<Table...>::table_for_class
     {
         static_assert(index_of_table<C>::value >= 0, "Connection does not contain any table matching the type T");
         using type = typename std::tuple_element<index_of_table<C>::value, std::tuple<Table...>>::type;
+    };
+
+    template <class... Table>
+    template<FixedLengthString name>
+    struct Connection<Table...>::table_for_name
+    {
+        static constexpr int idx = index_of_table_name<name>::value;
+        static_assert(idx >= 0, "Connection does not contain any table matching this name");
+        using type = typename std::tuple_element<idx, std::tuple<Table...>>::type;
     };
 
     template <class... Table>
@@ -214,25 +246,82 @@ namespace zxorm {
         __select_impl<table_for_class_t<From>, table_for_class_t<U>...>
     > { };
 
+
     template <class... Table>
-    template<typename SelectOrTable>
-    auto Connection<Table...>::make_select()
+    template<typename T, typename OtherTablesTuple>
+    struct Connection<Table...>::join_clause_type : std::false_type {};
+
+    template <class... Table>
+    template <typename T, join_type_t type, typename OtherTablesTuple>
+    struct Connection<Table...>::join_clause_type<Join<T, type>, OtherTablesTuple> : std::type_identity<
+        __join_impl<table_for_class_t<T>::name, type, OtherTablesTuple>
+    >{};
+
+    template <class... Table>
+    template<Field field_a, Field field_b, join_type_t type, typename OtherTablesTuple>
+    struct Connection<Table...>::join_clause_type<JoinOn<field_a, field_b, type>, OtherTablesTuple> : std::type_identity<
+        __join_on_impl<field_a, field_b, type, OtherTablesTuple>
+    >{};
+
+
+    template <class... Table>
+    template <typename JoinedTables, typename JoinedClauses, typename Last, typename... T>
+    struct Connection<Table...>::make_joins {
+        using join_t = typename join_clause_type<Last, JoinedTables>::type;
+        using type = decltype(std::tuple_cat(JoinedClauses{}, std::tuple<join_t>{}));
+    };
+
+    template <class... Table>
+    template <typename JoinedTables, typename JoinedClauses, typename Current, typename Next, typename... Tails>
+    struct Connection<Table...>::make_joins<JoinedTables, JoinedClauses, Current, Next, Tails...> {
+        using join_t = typename join_clause_type<Current, JoinedTables>::type;
+        using joined_clauses_t = decltype(std::tuple_cat(JoinedClauses{}, std::tuple<join_t>{}));
+        using joined_tables_t = decltype(std::tuple_cat(JoinedTables{}, std::tuple<table_for_name_t<join_t::joined_table_name>>{}));
+        using type = typename make_joins<joined_tables_t, joined_clauses_t, Next, Tails...>::type;
+    };
+
+    template <class... Table>
+    template <typename T>
+    struct Connection<Table...>::select_or_table_table : std::type_identity<table_for_class_t<T>> {};
+
+    template <class... Table>
+    template <typename From, typename... T>
+    struct Connection<Table...>::select_or_table_table<Select<From, T...>> : std::type_identity<table_for_class_t<From>> {};
+
+    template <class... Table>
+    template<typename SelectOrTable, typename... Joins>
+    auto Connection<Table...>::make_select_query()
     {
         static_assert(index_of_table<SelectOrTable>::value >= 0 || is_select_v<SelectOrTable>,
                 "Template argument for select queries should be a table to select, "
                 "or an `Select` template containing multiple tables");
 
-        using select_t = typename select_type<SelectOrTable>::type;
+        if constexpr (sizeof...(Joins)) {
+            static_assert(all_of<is_join<Joins>...>,
+                    "Template arguments for select query should be a `Join` or `JoinOn` clause");
 
-        return SelectQuery<select_t>(
-            _db_handle.get(),
-            _logger
-        );
+            using joins_tuple = typename make_joins<
+                std::tuple<typename select_or_table_table<SelectOrTable>::type>,
+                std::tuple<>,
+                Joins...>::type;
+
+            return std::apply([&](const auto&... a) {
+                return SelectQuery<typename select_type<SelectOrTable>::type, std::remove_reference_t<decltype(a)>...> (
+                    _db_handle.get(),
+                    _logger
+                );
+            }, joins_tuple{});
+        } else {
+            return SelectQuery<typename select_type<SelectOrTable>::type> (
+                _db_handle.get(),
+                _logger
+            );
+        }
     }
 
     template <class... Table>
     template<class T>
-    auto Connection<Table...>::make_delete()
+    auto Connection<Table...>::make_delete_query()
     {
         return Delete<T>(
             _db_handle.get(),
@@ -490,7 +579,7 @@ namespace zxorm {
                 "Primary key type does not match the type specified in the definition of the table");
 
         auto e = Field<table_t, primary_key_t::name>() == id;
-        return make_select<T>().where(e).one();
+        return make_select_query<T>().where(e).one();
     }
 
     template <class... Table>
@@ -506,7 +595,7 @@ namespace zxorm {
         static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
-        return make_delete<table_t>().where(Field<table_t, primary_key_t::name>() == id).exec();
+        return make_delete_query<table_t>().where(Field<table_t, primary_key_t::name>() == id).exec();
     }
 
     template <class... Table>
@@ -515,21 +604,21 @@ namespace zxorm {
         Delete<table_for_class_t<From>>
     {
         using table_t = table_for_class_t<From>;
-        return make_delete<table_t>();
+        return make_delete_query<table_t>();
     }
 
     template <class... Table>
-    template<typename Select>
-    auto Connection<Table...>::select()
+    template<typename Select, typename... Joins>
+    auto Connection<Table...>::select_query()
     {
-        return make_select<Select>();
+        return make_select_query<Select, Joins...>();
     }
 
     template <class... Table>
     template<class T>
     auto Connection<Table...>::first()
     {
-        return make_select<T>().one();
+        return make_select_query<T>().one();
     }
 
     template <class... Table>
@@ -538,7 +627,7 @@ namespace zxorm {
     {
         using table_t = table_for_class_t<T>;
         constexpr auto pk_name = table_t::primary_key_t::name;
-        return make_select<T>().template order_by<pk_name>(order_t::DESC).one();
+        return make_select_query<T>().template order_by<pk_name>(order_t::DESC).one();
     }
 
     template <class... Table>
@@ -549,7 +638,7 @@ namespace zxorm {
 
         ZXORM_GET_RESULT(
             auto stmt,
-            make_statement(std::string("DELETE FROM `") + table_t::name + "`;")
+            make_statement(std::string("DELETE FROM `") + table_t::name.value + "`;")
         );
 
         return stmt.step();

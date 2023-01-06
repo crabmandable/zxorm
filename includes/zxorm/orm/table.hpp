@@ -126,7 +126,7 @@ class Table {
         template <FixedLengthString name>
         static inline Field<Table, name> field = Field<Table, name>();
 
-        static constexpr auto name = table_name.value;
+        static constexpr auto name = table_name;
 
         static std::string create_table_query(bool if_not_exist) {
             std::stringstream query;
