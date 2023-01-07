@@ -2,7 +2,7 @@
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
 #include "zxorm/result.hpp"
-#include "zxorm/orm/query.hpp"
+#include "zxorm/orm/query/query.hpp"
 #include "zxorm/orm/record_iterator.hpp"
 
 namespace zxorm {

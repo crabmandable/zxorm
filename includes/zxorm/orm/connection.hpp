@@ -8,8 +8,8 @@
 #include "zxorm/orm/expression.hpp"
 #include "zxorm/result.hpp"
 #include "zxorm/orm/field.hpp"
-#include "zxorm/orm/select_query.hpp"
-#include "zxorm/orm/delete.hpp"
+#include "zxorm/orm/query/select_query.hpp"
+#include "zxorm/orm/query/delete_query.hpp"
 #include <functional>
 #include <sstream>
 #include <memory>
@@ -53,7 +53,7 @@ namespace zxorm {
         template<class SelectOrTable, class... Joins>
         auto make_select_query();
 
-        template<class T>
+        template<class From>
         auto make_delete_query();
 
         auto make_statement(const std::string& query);
@@ -124,14 +124,13 @@ namespace zxorm {
             [[nodiscard]] OptionalResult<T> find_record(const PrimaryKeyType& id);
 
         template<class T, typename PrimaryKeyType>
-            OptionalError remove_record(const PrimaryKeyType& id);
+            OptionalError delete_record(const PrimaryKeyType& id);
 
         template<class Select, class... Joins>
             [[nodiscard]] auto select_query();
 
         template<class From>
-            [[nodiscard]] auto remove() ->
-                Delete<table_for_class_t<From>>;
+            [[nodiscard]] auto delete_query();
 
 
         template<class T>
@@ -320,10 +319,10 @@ namespace zxorm {
     }
 
     template <class... Table>
-    template<class T>
+    template<class From>
     auto Connection<Table...>::make_delete_query()
     {
-        return Delete<T>(
+        return DeleteQuery<table_for_class_t<From>>(
             _db_handle.get(),
             _logger
         );
@@ -584,7 +583,7 @@ namespace zxorm {
 
     template <class... Table>
     template<class T, typename PrimaryKeyType>
-    OptionalError Connection<Table...>::remove_record(const PrimaryKeyType& id)
+    OptionalError Connection<Table...>::delete_record(const PrimaryKeyType& id)
     {
         using table_t = table_for_class_t<T>;
 
@@ -595,16 +594,14 @@ namespace zxorm {
         static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
-        return make_delete_query<table_t>().where(Field<table_t, primary_key_t::name>() == id).exec();
+        return make_delete_query<T>().where(Field<table_t, primary_key_t::name>() == id).exec();
     }
 
     template <class... Table>
     template<class From>
-    auto Connection<Table...>::remove() ->
-        Delete<table_for_class_t<From>>
+    auto Connection<Table...>::delete_query()
     {
-        using table_t = table_for_class_t<From>;
-        return make_delete_query<table_t>();
+        return make_delete_query<From>();
     }
 
     template <class... Table>

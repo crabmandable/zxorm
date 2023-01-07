@@ -3,7 +3,7 @@
 #include "zxorm/result.hpp"
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
-#include "zxorm/orm/clause.hpp"
+#include "zxorm/orm/query/clause.hpp"
 #include "zxorm/orm/field.hpp"
 #include <sqlite3.h>
 

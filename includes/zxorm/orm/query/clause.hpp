@@ -97,7 +97,7 @@ namespace zxorm {
             static constexpr int value = index_of_first<T::template does_reference_table<foreign_table>...>::value;
         };
 
-        using table_t = std::remove_reference_t<decltype(std::get<index_of_table<AlreadyJoinedTuple>::value>(AlreadyJoinedTuple{}))>;
+        using table_t = std::tuple_element_t<index_of_table<AlreadyJoinedTuple>::value, AlreadyJoinedTuple>;
 
         using select_column = typename table_t::foreign_column<foreign_table>;
         using foreign_key_t = typename select_column::foreign_key_t;

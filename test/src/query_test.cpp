@@ -170,7 +170,7 @@ TEST_F(QueryTest, DeleteSomething)
 
     auto err = my_conn->insert_record(obj);
     ASSERT_FALSE(err);
-    err = my_conn->remove_record<Object>(1);
+    err = my_conn->delete_record<Object>(1);
     ASSERT_FALSE(err);
     auto result = my_conn->find_record<Object>(1);
     ASSERT_FALSE(result.is_error());
@@ -738,7 +738,7 @@ TEST_F(QueryTest, DeleteWhere)
     auto err = my_conn->insert_many_records(objects);
     ASSERT_FALSE(err);
 
-    err = my_conn->remove<Object>().where(table_t::field<"float"> >= (100.0 * 3.14)).exec();
+    err = my_conn->delete_query<Object>().where(table_t::field<"float"> >= (100.0 * 3.14)).exec();
     ASSERT_FALSE(err);
 
     auto result = my_conn->select_query<Object>().many();

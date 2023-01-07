@@ -2,7 +2,7 @@
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
 #include "zxorm/result.hpp"
-#include "zxorm/orm/query.hpp"
+#include "zxorm/orm/query/query.hpp"
 
 namespace zxorm {
     namespace __delete_detail {
@@ -13,28 +13,16 @@ namespace zxorm {
             }
         };
     };
-    template <class Table>
-    class Delete : public Query<Table, __delete_detail::DeleteColumnClause> {
-    using Super = Query<Table, __delete_detail::DeleteColumnClause>;
+    template <class From, typename... Joins>
+    class DeleteQuery : public Query<From, __delete_detail::DeleteColumnClause> {
+    using Super = Query<From, __delete_detail::DeleteColumnClause>;
 
     public:
-        Delete(sqlite3* handle, Logger logger) :
+        DeleteQuery(sqlite3* handle, Logger logger) :
             Super(handle, logger) {}
 
         auto where(auto&&... args) {
             Super::where(std::forward<decltype(args)>(args)...);
-            return *this;
-        }
-
-        template <Field field_a, Field field_b>
-        auto join(join_type_t type = join_type_t::INNER) {
-            Super::template join<field_a, field_b>(type);
-            return *this;
-        }
-
-        template <FixedLengthString foreign_table>
-        auto join(join_type_t type = join_type_t::INNER) {
-            Super::template join<foreign_table>(type);
             return *this;
         }
 
