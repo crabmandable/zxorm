@@ -72,7 +72,10 @@ int main (void) {
     connection.update_record(found.value());
 
     // find a record by some other column
-    auto zach = connection.where<Student>(StudentTable::field<"name">.like("zach")).one();
+    auto zach = connection.select_query<Student>()
+        .where(StudentTable::field<"name">.like("zach"))
+        .one();
+
     if (zach.is_error() || !zach.has_value()) {
         throw std::runtime_error("Couldn't find zach");
     }
@@ -86,10 +89,10 @@ int main (void) {
     });
 
     // find many records with a more complicated WHERE clause
-    auto students = connection.where<Student>(
-        StudentTable::field<"gpa"> >= 3.0 &&
-        StudentTable::field<"year"> > Student::Year::Freshman
-    ).many();
+    auto students = connection.select_query<Student>()
+        .where(StudentTable::field<"gpa"> >= 3.0 &&
+               StudentTable::field<"year"> >= Student::Year::Sophmore)
+        .many();
 
     std::cout << "passing students:\n";
     for (const Result<Student>& student: students.value()) {
