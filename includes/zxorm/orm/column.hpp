@@ -107,6 +107,7 @@ namespace zxorm {
         static constexpr auto name = column_name;
 
         static auto& getter(auto& obj) { return obj.*M; };
+        static const auto& getter(const auto& obj) { return obj.*M; };
         static void setter(auto& obj, auto arg) { obj.*M = arg; };
 
         static std::string constraint_creation_query() {

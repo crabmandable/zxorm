@@ -35,7 +35,7 @@ namespace zxorm {
 
         template<class C> static constexpr bool table_has_rowid();
 
-        template<typename T>
+        template<typename selectables_tuple, typename T>
         struct select_type;
 
         template <typename T>
@@ -235,15 +235,43 @@ namespace zxorm {
     }
 
 
-    template <class... Table>
-    template<typename T>
-    struct Connection<Table...>::select_type : std::type_identity<__select_impl<table_for_class_t<T>>> { };
+    template <FixedLengthString table_name, typename selectables_tuple>
+    struct selection_exists: std::false_type {};
+
+    template <FixedLengthString table_name, typename... T>
+    struct selection_exists<table_name, std::tuple<T...>> : std::bool_constant<(... || (T::table_name == table_name))> {};
+
+    template <FixedLengthString table_name, typename selectables_tuple>
+    static constexpr bool selection_exists_v = selection_exists<table_name, selectables_tuple>::value;
+
+    template <FixedLengthString table_name, typename selectables_tuple>
+    struct selection_is_optional: std::false_type {};
+
+    template <FixedLengthString table_name, typename... T>
+    struct selection_is_optional<table_name, std::tuple<T...>>: std::bool_constant<
+        not (... && (table_name != T::table_name || not T::is_optional))
+    > {};
+
+    template <FixedLengthString table_name, typename selectables_tuple>
+    static constexpr bool selection_is_optional_v = selection_is_optional<table_name, selectables_tuple>::value;
+
+    template<typename selectables_tuple, typename table>
+    struct selectable_for_clause : std::type_identity<
+        __selectable<selection_is_optional_v<table::name, selectables_tuple>, table>
+    >{};
 
     template <class... Table>
-    template<typename From, typename... U>
-    struct Connection<Table...>::select_type<Select<From, U...>> : std::type_identity<
-        __select_impl<table_for_class_t<From>, table_for_class_t<U>...>
-    > { };
+    template<typename selectables_tuple, typename T>
+    struct Connection<Table...>::select_type : std::type_identity<__select_impl<__selectable<false, table_for_class_t<T>>>> { };
+
+    template <class... Table>
+    template<typename selectables_tuple, typename From, typename... U>
+    struct Connection<Table...>::select_type<selectables_tuple, Select<From, U...>> {
+        using type = __select_impl<
+            typename selectable_for_clause<selectables_tuple, table_for_class_t<From>>::type,
+            typename selectable_for_clause<selectables_tuple, table_for_class_t<U>>::type...
+        >;
+    };
 
 
     template <class... Table>
@@ -275,7 +303,7 @@ namespace zxorm {
     struct Connection<Table...>::make_joins<JoinedTables, JoinedClauses, Current, Next, Tails...> {
         using join_t = typename join_clause_type<Current, JoinedTables>::type;
         using joined_clauses_t = decltype(std::tuple_cat(JoinedClauses{}, std::tuple<join_t>{}));
-        using joined_tables_t = decltype(std::tuple_cat(JoinedTables{}, std::tuple<table_for_name_t<join_t::joined_table_name>>{}));
+        using joined_tables_t = decltype(std::tuple_cat(JoinedTables{}, std::tuple<table_for_name_t<join_t::right_table_name>>{}));
         using type = typename make_joins<joined_tables_t, joined_clauses_t, Next, Tails...>::type;
     };
 
@@ -286,6 +314,20 @@ namespace zxorm {
     template <class... Table>
     template <typename From, typename... T>
     struct Connection<Table...>::select_or_table_table<Select<From, T...>> : std::type_identity<table_for_class_t<From>> {};
+
+    template<class Join>
+    auto get_seletables_from_join(Join j) {
+        return typename decltype(j)::selectables_tuple {};
+    }
+
+    template <typename T>
+    struct selectables_from_joins;
+
+    template <typename... T>
+    struct selectables_from_joins<std::tuple<T...>> {
+        using nested = std::tuple<decltype(get_seletables_from_join(std::declval<T>()))...>;
+        using type = decltype(flatten_tuple(std::declval<nested>()));
+    };
 
     template <class... Table>
     template<typename SelectOrTable, typename... Joins>
@@ -304,14 +346,16 @@ namespace zxorm {
                 std::tuple<>,
                 Joins...>::type;
 
+            using selectables_t = typename selectables_from_joins<joins_tuple>::type;
+
             return std::apply([&](const auto&... a) {
-                return SelectQuery<typename select_type<SelectOrTable>::type, std::remove_reference_t<decltype(a)>...> (
+                return SelectQuery<typename select_type<selectables_t, SelectOrTable>::type, std::remove_reference_t<decltype(a)>...> (
                     _db_handle.get(),
                     _logger
                 );
             }, joins_tuple{});
         } else {
-            return SelectQuery<typename select_type<SelectOrTable>::type> (
+            return SelectQuery<typename select_type<std::tuple<>, SelectOrTable>::type> (
                 _db_handle.get(),
                 _logger
             );

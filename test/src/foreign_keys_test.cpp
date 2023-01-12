@@ -344,3 +344,74 @@ TEST_F(ForeignKeysTest, NestedJoin) {
     ASSERT_EQ(obj1res.id, obj1.id);
     ASSERT_STREQ(obj1res.text.c_str(), test_text);
 }
+
+TEST_F(ForeignKeysTest, LeftJoin) {
+    auto test_text = "hello there";
+    Object1 obj1 = {.text = test_text};
+    auto err = my_conn->insert_record(obj1);
+    ASSERT_FALSE(err);
+
+    Object2 obj2_1 = {.obj1_id = obj1.id};
+    Object2 obj2_2 = {.obj1_id = obj1.id};
+    Object2 obj2_3 = {.obj1_id = obj1.id + 10};
+    err = my_conn->insert_record(obj2_1);
+    ASSERT_FALSE(err);
+    err = my_conn->insert_record(obj2_2);
+    ASSERT_FALSE(err);
+    err = my_conn->insert_record(obj2_3);
+    ASSERT_FALSE(err);
+
+    auto results = my_conn->select_query<Select<Object2, Object1>, Join<Object1, join_type_t::LEFT_OUTER>>().many();
+
+    if (results.is_error()) std::cout << results.error() << std::endl;
+    ASSERT_FALSE(results.is_error());
+
+    auto data = results.value().to_vector();
+    ASSERT_FALSE(data.is_error());
+    auto rows = std::move(data.value());
+    ASSERT_EQ(rows.size(), 3);
+
+    ASSERT_TRUE(std::get<1>(rows[0]).has_value());
+    ASSERT_EQ(std::get<1>(rows[0]).value().id, obj1.id);
+
+    ASSERT_TRUE(std::get<1>(rows[1]).has_value());
+    ASSERT_EQ(std::get<1>(rows[1]).value().id, obj1.id);
+
+    ASSERT_FALSE(std::get<1>(rows[2]).has_value());
+}
+
+TEST_F(ForeignKeysTest, RightJoin) {
+    auto test_text = "hello there";
+    Object1 obj1 = {.text = test_text};
+    auto err = my_conn->insert_record(obj1);
+    ASSERT_FALSE(err);
+
+    Object2 obj2_1 = {.obj1_id = obj1.id};
+    Object2 obj2_2 = {.obj1_id = obj1.id};
+    Object2 obj2_3 = {.obj1_id = obj1.id + 10};
+    err = my_conn->insert_record(obj2_1);
+    ASSERT_FALSE(err);
+    err = my_conn->insert_record(obj2_2);
+    ASSERT_FALSE(err);
+    err = my_conn->insert_record(obj2_3);
+    ASSERT_FALSE(err);
+
+    auto results = my_conn->select_query<Select<Object1, Object2>,
+         JoinOn<table1::field<"id">, table2::field<"obj1_id">, join_type_t::RIGHT_OUTER>>().many();
+
+    if (results.is_error()) std::cout << results.error() << std::endl;
+    ASSERT_FALSE(results.is_error());
+
+    auto data = results.value().to_vector();
+    ASSERT_FALSE(data.is_error());
+    auto rows = std::move(data.value());
+    ASSERT_EQ(rows.size(), 3);
+
+    ASSERT_TRUE(std::get<0>(rows[0]).has_value());
+    ASSERT_EQ(std::get<0>(rows[0]).value().id, obj1.id);
+
+    ASSERT_TRUE(std::get<0>(rows[1]).has_value());
+    ASSERT_EQ(std::get<0>(rows[1]).value().id, obj1.id);
+
+    ASSERT_FALSE(std::get<0>(rows[2]).has_value());
+}

@@ -69,23 +69,7 @@ namespace zxorm {
         template <typename T>
         using with_offsets_t = typename with_offsets<T>::type;
 
-        // unused base case
-        template <typename T>
-        struct tuple_return : std::false_type {};
-
-        template <typename... T>
-        struct tuple_return <std::tuple<T...>> : std::type_identity<
-            std::tuple<typename T::object_class...>
-        > {};
-
-        template <typename T>
-        using tuple_return_t = typename tuple_return<T>::type;
-
-        using return_t = std::conditional_t<
-            is_multi_table_select,
-            tuple_return_t<typename Select::tables_t>,
-            typename Select::from_t::object_class
-        >;
+        using return_t = typename Select::return_t;
 
         // unused base case
         template <typename T>
@@ -93,10 +77,25 @@ namespace zxorm {
 
         template <typename... T>
         struct result_tuple <std::tuple<T...>> : std::type_identity<
-            std::tuple<Result<typename T::object_class>...>
+            std::tuple<OptionalResult<typename T::object_class>...>
         > {};
 
         using result_tuple_t = typename result_tuple<typename Select::tables_t>::type;
+
+        template<size_t record_index, typename T>
+        requires (Select::is_optional[record_index])
+        static auto row_res_to_row (const OptionalResult<T>& row_res) -> std::optional<T> {
+            if (row_res.has_value()) {
+                return row_res.value();
+            }
+
+            return std::nullopt;
+        }
+
+        template<size_t record_index, typename T>
+        static auto row_res_to_row (const OptionalResult<T>& row_res) -> T {
+            return row_res.value();
+        }
 
         static auto read_row(Statement& s) -> Result<return_t>
         {
@@ -107,8 +106,22 @@ namespace zxorm {
                     auto get_row = [&](const auto& pair) {
                         using pair_t = std::remove_reference_t<decltype(pair)>;
                         using table_t = pair_t::type;
+                        using row_t = OptionalResult<typename table_t::object_class>;
+
                         constexpr size_t offset = pair_t::offset;
-                        return table_t::get_row(s, offset);
+                        auto row = table_t::get_row(s, offset);
+
+                        if (row.is_error()) return row_t{std::move(row)};
+
+                        // NULL primary key means the record is NULL
+                        // which can happen depending on joins
+                        if (Select::is_optional[tuple_index<table_t, typename Select::tables_t>::value] &&
+                                not table_t::primary_key_t::getter(row.value()))
+                        {
+                            return row_t{std::nullopt};
+                        }
+
+                        return row_t{std::move(row)};
                     };
 
 
@@ -130,7 +143,7 @@ namespace zxorm {
 
                     // if there is no error, set the values
                     if (!us.is_error()) {
-                        us = { a.value()... };
+                        us = { row_res_to_row<tuple_index<decltype(a), std::tuple<decltype(a)...>>::value>(a)... };
                     }
                 }, us_res);
 
