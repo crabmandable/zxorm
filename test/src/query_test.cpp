@@ -527,7 +527,7 @@ TEST_F(QueryTest, WhereNotIn)
         ASSERT_FALSE(err);
     }
 
-    auto search = std::vector<std::string>{"hello1", "hello2"};
+    auto search = std::array<std::string, 2>{"hello1", "hello2"};
 
     auto result = my_conn->select_query<Object>()
         .where(table_t::field<"text">.not_in(search))

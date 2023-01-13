@@ -3,13 +3,10 @@
 #include "zxorm/orm/expression.hpp"
 
 namespace zxorm {
-    template<typename T>
-    struct is_multi_value_binding : std::false_type {};
-
-    template<template <typename...> class Container, class... T>
-    struct is_multi_value_binding<Container<T...>> : std::bool_constant<
-        not traits::is_basic_string<Container<T...>>::value &&
-            is_indexable_container<Container<T...>>::value
+    template<typename Container>
+    struct is_multi_value_binding : std::bool_constant<
+        not traits::is_basic_string<Container>::value &&
+            is_indexable_container<Container>::value
     >{};
 
     template <typename Table, FixedLengthString _name>
