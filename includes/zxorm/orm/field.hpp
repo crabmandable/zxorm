@@ -3,6 +3,15 @@
 #include "zxorm/orm/expression.hpp"
 
 namespace zxorm {
+    template<typename T>
+    struct is_multi_value_binding : std::false_type {};
+
+    template<template <typename...> class Container, class... T>
+    struct is_multi_value_binding<Container<T...>> : std::bool_constant<
+        not traits::is_basic_string<Container<T...>>::value &&
+            is_indexable_container<Container<T...>>::value
+    >{};
+
     template <typename Table, FixedLengthString _name>
     struct Field {
         using column_t = typename Table::column_by_name<_name>::type;
@@ -69,6 +78,18 @@ namespace zxorm {
         template <typename M=void>
         requires (column_t::sql_column_type == sqlite_column_type::TEXT)
         ColumnExpression<Table, column_t, comparison_op_t::NOT_GLOB, std::string> not_glob(std::string value) {
+            return value;
+        }
+
+        template <typename Container>
+        requires(is_multi_value_binding<Container>::value)
+        ColumnExpression<Table, column_t, comparison_op_t::IN, Container> in(Container value) {
+            return value;
+        }
+
+        template <typename Container>
+        requires(is_multi_value_binding<Container>::value)
+        ColumnExpression<Table, column_t, comparison_op_t::NOT_IN, Container> not_in(Container value) {
             return value;
         }
 

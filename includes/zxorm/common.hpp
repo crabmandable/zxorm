@@ -131,8 +131,16 @@ namespace zxorm {
         }
     };
 
+    template<typename Container>
+    struct is_indexable_container : std::bool_constant<
+        requires(const Container& c) {
+            c[0];
+            c.size();
+        }
+    >{};
+
     template<typename Container, typename T>
-    concept IndexableContainer = requires(const Container& c) {
+    concept IndexableContainer = is_indexable_container<Container>::value && requires(const Container& c) {
         {c[0]} -> std::same_as<const T&>;
     };
 

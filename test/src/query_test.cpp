@@ -494,6 +494,54 @@ TEST_F(QueryTest, WhereNotGlob)
     ASSERT_EQ(vec.value().size(), 1);
 }
 
+TEST_F(QueryTest, WhereIn)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    auto search = std::vector<std::string>{"hello1", "hello2"};
+
+    auto result = my_conn->select_query<Object>()
+        .where(table_t::field<"text">.in(search))
+        .many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 2);
+}
+
+TEST_F(QueryTest, WhereNotIn)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    auto search = std::vector<std::string>{"hello1", "hello2"};
+
+    auto result = my_conn->select_query<Object>()
+        .where(table_t::field<"text">.not_in(search))
+        .many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 2);
+}
+
 TEST_F(QueryTest, All)
 {
     Object obj;

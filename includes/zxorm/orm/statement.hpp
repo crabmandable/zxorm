@@ -10,6 +10,7 @@
 #include "zxorm/common.hpp"
 #include "zxorm/error.hpp"
 #include "zxorm/orm/types.hpp"
+#include "zxorm/orm/field.hpp"
 #include "zxorm/helpers/meta_container.hpp"
 
 namespace zxorm {
@@ -63,7 +64,13 @@ namespace zxorm {
             std::apply([&](const auto&... binding) {
                 ([&]() {
                     if (err) return;
-                    err = bind(i++, binding);
+                    if constexpr (is_multi_value_binding<std::remove_cvref_t<decltype(binding)>>::value) {
+                        for (size_t j = 0; j < binding.size() && !err; j++) {
+                            err = bind(i++, binding[j]);
+                        }
+                    } else {
+                        err = bind(i++, binding);
+                    }
                 }(), ...);
             }, tuple);
 

@@ -13,6 +13,8 @@ namespace zxorm {
         NOT_LIKE,
         GLOB,
         NOT_GLOB,
+        IN,
+        NOT_IN,
     };
 
     static inline std::ostream & operator<< (std::ostream &out, const comparison_op_t& op) {
@@ -46,6 +48,12 @@ namespace zxorm {
                 break;
             case comparison_op_t::NOT_GLOB:
                 out << " NOT GLOB ";
+                break;
+            case comparison_op_t::IN:
+                out << " IN ";
+                break;
+            case comparison_op_t::NOT_IN:
+                out << " NOT IN ";
                 break;
         }
         return out;
@@ -117,7 +125,17 @@ namespace zxorm {
 
         std::string serialize() const {
             std::stringstream ss;
-            ss << "`" << Table::name.value << "`.`" << Column::name.value << "` " << op << " ?";
+            ss << "`" << Table::name.value << "`.`" << Column::name.value << "` " << op;
+            if constexpr (op == comparison_op_t::IN || op == comparison_op_t::NOT_IN) {
+                ss << " (";
+                for (size_t i = 0; i < to_bind.size(); i++) {
+                    ss << "?,";
+                }
+                ss.seekp(-1, std::ios_base::end);
+                ss << ") ";
+            } else {
+                ss << " ?";
+            }
             return ss.str();
         }
 

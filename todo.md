@@ -1,11 +1,6 @@
 Note to self: start from top
 
-* Join
-    - Prevent bad queries that result from selecting tables that aren't in the query
-
 * Enforce type safety for where expressions
-
-* WHERE x in (?, ?, ?) etc
 
 * Count with query
 
