@@ -31,24 +31,25 @@ namespace zxorm {
     };
 
     // This is the actual clause we use in the query
-    template <typename From, typename... U>
+    template <bool optional_results, typename From, typename... U>
     struct __select_impl {
         using from_t = From::table;
         using tables_t = std::tuple<typename From::table, typename U::table...>;
 
         static constexpr std::array<bool, sizeof...(U) + 1> is_optional = {
-            From::is_optional, U::is_optional...
+            optional_results ||  From::is_optional,
+            optional_results ||  U::is_optional...
         };
 
         using return_t = std::conditional_t<sizeof...(U),
             std::tuple<
-                std::conditional_t<From::is_optional, std::optional<typename From::table::object_class>, typename From::table::object_class>,
-                std::conditional_t<U::is_optional, std::optional<typename U::table::object_class>, typename U::table::object_class>...
+                std::conditional_t<optional_results || From::is_optional, std::optional<typename From::table::object_class>, typename From::table::object_class>,
+                std::conditional_t<optional_results || U::is_optional, std::optional<typename U::table::object_class>, typename U::table::object_class>...
             >,
             typename From::table::object_class
         >;
 
-        friend std::ostream & operator<< (std::ostream &out, const __select_impl<From, U...>&) {
+        friend std::ostream & operator<< (std::ostream &out, const __select_impl<optional_results, From, U...>&) {
             out << "SELECT ";
                 std::apply([&](const auto&... a) {
                     ([&]() {
@@ -144,6 +145,8 @@ namespace zxorm {
 
         using table_t = std::tuple_element_t<index_of_table<AlreadyJoinedTuple>::value, AlreadyJoinedTuple>;
 
+        static constexpr bool is_nested = index_of_table<AlreadyJoinedTuple>::value > 0;
+
         using select_column = typename table_t::foreign_column<foreign_table>;
         using foreign_key_t = typename select_column::foreign_key_t;
 
@@ -185,12 +188,15 @@ namespace zxorm {
         struct _left_is_a<std::tuple<T...>> : std::bool_constant<any_of<std::is_same_v<table_a_t, T>...>> {};
         static constexpr bool left_is_a = _left_is_a<AlreadyJoinedTuple>::value;
 
+
         static_assert(left_is_a || left_is_b,
                 "One of the join fields should belong a table being queried, "
                 "or another table already joined");
 
         using left_table_t = std::conditional_t<left_is_a, table_a_t, table_b_t>;
         using right_table_t = std::conditional_t<left_is_b, table_a_t, table_b_t>;
+
+        static constexpr bool is_nested = tuple_index<left_table_t, AlreadyJoinedTuple>::value > 0;
 
         static constexpr auto left_table_name = left_table_t::name;
         static constexpr auto left_field_name = left_is_a ? field_a_t::name : field_b_t::name;

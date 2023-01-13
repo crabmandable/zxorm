@@ -415,3 +415,65 @@ TEST_F(ForeignKeysTest, RightJoin) {
 
     ASSERT_FALSE(std::get<0>(rows[2]).has_value());
 }
+
+TEST_F(ForeignKeysTest, NestedOuter) {
+    auto test_text_1 = "hello there";
+    auto test_text_2 = "howdy";
+    Object1 obj1_1 = {.text = test_text_1};
+    auto err = my_conn->insert_record(obj1_1);
+    ASSERT_FALSE(err);
+    Object1 obj1_2 = {.text = test_text_2};
+    err = my_conn->insert_record(obj1_2);
+    ASSERT_FALSE(err);
+
+    Object2 obj2 = {.obj1_id = obj1_1.id};
+    err = my_conn->insert_record(obj2);
+    ASSERT_FALSE(err);
+
+    Object3 obj3 = {.obj1_id = obj1_1.id, .obj2_id = obj2.id};
+    err = my_conn->insert_record(obj3);
+    ASSERT_FALSE(err);
+
+    auto results = my_conn->select_query<
+        Select<Object3, Object2, Object1>,
+        Join<Object2>,
+        JoinOn<table2::field<"obj1_id">, table1::field<"id">, join_type_t::FULL_OUTER>
+    >().many();
+
+    if (results.is_error()) std::cout << results.error() << std::endl;
+    ASSERT_FALSE(results.is_error());
+
+    auto data = results.value().to_vector();
+    ASSERT_FALSE(data.is_error());
+    auto rows = std::move(data.value());
+    ASSERT_EQ(rows.size(), 2);
+
+    auto row1 = rows[0];
+
+    auto obj3res = std::get<0>(row1);
+    ASSERT_TRUE(obj3res.has_value());
+    ASSERT_EQ(obj3res.value().id, obj3.id);
+    ASSERT_EQ(obj3res.value().obj2_id, obj2.id);
+    ASSERT_EQ(obj3res.value().obj1_id, obj1_1.id);
+
+    auto obj2res = std::get<1>(row1);
+    ASSERT_TRUE(obj2res.has_value());
+    ASSERT_EQ(obj2res.value().id, obj2.id);
+    ASSERT_EQ(obj2res.value().obj1_id, obj1_1.id);
+
+    auto obj1res = std::get<2>(row1);
+    ASSERT_TRUE(obj1res.has_value());
+    ASSERT_EQ(obj1res.value().id, obj1_1.id);
+    ASSERT_STREQ(obj1res.value().text.c_str(), test_text_1);
+
+    auto row2 = rows[1];
+
+    obj3res = std::get<0>(row2);
+    ASSERT_FALSE(obj3res.has_value());
+    obj2res = std::get<1>(row2);
+    ASSERT_FALSE(obj2res.has_value());
+    obj1res = std::get<2>(row2);
+    ASSERT_TRUE(obj1res.has_value());
+    ASSERT_EQ(obj1res.value().id, obj1_2.id);
+    ASSERT_STREQ(obj1res.value().text.c_str(), test_text_2);
+}

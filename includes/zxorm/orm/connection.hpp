@@ -35,7 +35,7 @@ namespace zxorm {
 
         template<class C> static constexpr bool table_has_rowid();
 
-        template<typename selectables_tuple, typename T>
+        template<bool results_are_optional, typename selectables_tuple, typename T>
         struct select_type;
 
         template <typename T>
@@ -261,13 +261,14 @@ namespace zxorm {
     >{};
 
     template <class... Table>
-    template<typename selectables_tuple, typename T>
-    struct Connection<Table...>::select_type : std::type_identity<__select_impl<__selectable<false, table_for_class_t<T>>>> { };
+    template<bool results_are_optional, typename selectables_tuple, typename T>
+    struct Connection<Table...>::select_type : std::type_identity<__select_impl<false, __selectable<false, table_for_class_t<T>>>> { };
 
     template <class... Table>
-    template<typename selectables_tuple, typename From, typename... U>
-    struct Connection<Table...>::select_type<selectables_tuple, Select<From, U...>> {
+    template<bool results_are_optional, typename selectables_tuple, typename From, typename... U>
+    struct Connection<Table...>::select_type<results_are_optional, selectables_tuple, Select<From, U...>> {
         using type = __select_impl<
+            results_are_optional,
             typename selectable_for_clause<selectables_tuple, table_for_class_t<From>>::type,
             typename selectable_for_clause<selectables_tuple, table_for_class_t<U>>::type...
         >;
@@ -296,6 +297,7 @@ namespace zxorm {
     struct Connection<Table...>::make_joins {
         using join_t = typename join_clause_type<Last, JoinedTables>::type;
         using type = decltype(std::tuple_cat(JoinedClauses{}, std::tuple<join_t>{}));
+        static constexpr bool query_is_nested = join_t::is_nested;
     };
 
     template <class... Table>
@@ -305,6 +307,7 @@ namespace zxorm {
         using joined_clauses_t = decltype(std::tuple_cat(JoinedClauses{}, std::tuple<join_t>{}));
         using joined_tables_t = decltype(std::tuple_cat(JoinedTables{}, std::tuple<table_for_name_t<join_t::right_table_name>>{}));
         using type = typename make_joins<joined_tables_t, joined_clauses_t, Next, Tails...>::type;
+        static constexpr bool query_is_nested = join_t::is_nested ||  make_joins<joined_tables_t, joined_clauses_t, Next, Tails...>::query_is_nested;
     };
 
     template <class... Table>
@@ -329,6 +332,12 @@ namespace zxorm {
         using type = decltype(flatten_tuple(std::declval<nested>()));
     };
 
+    template <typename T>
+    struct a_selection_is_optional;
+
+    template <typename... T>
+    struct a_selection_is_optional<std::tuple<T...>> : std::bool_constant<(... || T::is_optional)> {};
+
     template <class... Table>
     template<typename SelectOrTable, typename... Joins>
     auto Connection<Table...>::make_select_query()
@@ -341,21 +350,25 @@ namespace zxorm {
             static_assert(all_of<is_join<Joins>...>,
                     "Template arguments for select query should be a `Join` or `JoinOn` clause");
 
-            using joins_tuple = typename make_joins<
+            using join_meta = make_joins<
                 std::tuple<typename select_or_table_table<SelectOrTable>::type>,
                 std::tuple<>,
-                Joins...>::type;
+                Joins...>;
+
+            using joins_tuple = typename join_meta::type;
+            static constexpr bool query_is_nested = join_meta::query_is_nested;
 
             using selectables_t = typename selectables_from_joins<joins_tuple>::type;
 
+            static constexpr bool results_are_optional = query_is_nested && a_selection_is_optional<selectables_t>::value;
             return std::apply([&](const auto&... a) {
-                return SelectQuery<typename select_type<selectables_t, SelectOrTable>::type, std::remove_reference_t<decltype(a)>...> (
+                return SelectQuery<typename select_type<results_are_optional, selectables_t, SelectOrTable>::type, std::remove_reference_t<decltype(a)>...> (
                     _db_handle.get(),
                     _logger
                 );
             }, joins_tuple{});
         } else {
-            return SelectQuery<typename select_type<std::tuple<>, SelectOrTable>::type> (
+            return SelectQuery<typename select_type<false, std::tuple<>, SelectOrTable>::type> (
                 _db_handle.get(),
                 _logger
             );
