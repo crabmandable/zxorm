@@ -47,6 +47,9 @@ namespace zxorm {
         template <typename JoinedTables, typename JoinedClauses, typename Last, typename... T>
         struct make_joins;
 
+        template <typename selectables_tuple, typename T>
+        struct selections_are_selectable;
+
         void log_error(const Error& err);
         inline void log_error(const OptionalError& err);
 
@@ -338,6 +341,21 @@ namespace zxorm {
     template <typename... T>
     struct a_selection_is_optional<std::tuple<T...>> : std::bool_constant<(... || T::is_optional)> {};
 
+    template <FixedLengthString name, typename T>
+    struct table_in_selectables;
+    template <FixedLengthString name, typename... T>
+    struct table_in_selectables<name, std::tuple<T...>> : std::bool_constant<(... || (T::table_name == name))> {};
+
+    template <class... Table>
+    template <typename selectables_tuple, typename T>
+    struct Connection<Table...>::selections_are_selectable : std::true_type {};
+
+    template <class... Table>
+    template <typename selectables_tuple, typename... T>
+    struct Connection<Table...>::selections_are_selectable<selectables_tuple, Select<T...>> : std::bool_constant<
+        (... && (table_in_selectables<table_for_class_t<T>::name, selectables_tuple>::value))
+    > {};
+
     template <class... Table>
     template<typename SelectOrTable, typename... Joins>
     auto Connection<Table...>::make_select_query()
@@ -359,6 +377,9 @@ namespace zxorm {
             static constexpr bool query_is_nested = join_meta::query_is_nested;
 
             using selectables_t = typename selectables_from_joins<joins_tuple>::type;
+
+            static_assert(selections_are_selectable<selectables_t, SelectOrTable>::value,
+                    "One of the selected tables is not present in the query.");
 
             static constexpr bool results_are_optional = query_is_nested && a_selection_is_optional<selectables_t>::value;
             return std::apply([&](const auto&... a) {
