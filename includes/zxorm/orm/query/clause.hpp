@@ -31,25 +31,39 @@ namespace zxorm {
     };
 
     // This is the actual clause we use in the query
-    template <bool optional_results, typename From, typename... U>
+    template <bool optional_results, typename From, typename... Selections>
     struct __select_impl {
-        using from_t = From::table;
-        using tables_t = std::tuple<typename From::table, typename U::table...>;
+        static_assert(sizeof...(Selections),
+                "At least one table must be selected");
 
-        static constexpr std::array<bool, sizeof...(U) + 1> is_optional = {
-            optional_results ||  From::is_optional,
-            optional_results ||  U::is_optional...
+        using from_t = From;
+        using tables_t = std::tuple<typename Selections::table...>;
+
+        static constexpr std::array<bool, sizeof...(Selections)> is_optional = {
+            optional_results ||  Selections::is_optional...
         };
 
-        using return_t = std::conditional_t<sizeof...(U),
-            std::tuple<
-                std::conditional_t<optional_results || From::is_optional, std::optional<typename From::table::object_class>, typename From::table::object_class>,
-                std::conditional_t<optional_results || U::is_optional, std::optional<typename U::table::object_class>, typename U::table::object_class>...
-            >,
-            typename From::table::object_class
-        >;
+        template <typename... S>
+        struct _selection_return {
+            using type = std::tuple<
+                std::conditional_t<optional_results || S::is_optional,
+                    std::optional<typename S::table::object_class>,
+                    typename S::table::object_class
+                >...
+            >;
+        };
 
-        friend std::ostream & operator<< (std::ostream &out, const __select_impl<optional_results, From, U...>&) {
+        template <typename S>
+        struct _selection_return <S> {
+            using type = std::conditional_t<optional_results || S::is_optional,
+                std::optional<typename S::table::object_class>,
+                typename S::table::object_class
+            >;
+        };
+
+        using return_t = typename _selection_return<Selections...>::type;
+
+        friend std::ostream & operator<< (std::ostream &out, const __select_impl<optional_results, From, Selections...>&) {
             out << "SELECT ";
                 std::apply([&](const auto&... a) {
                     ([&]() {
@@ -220,12 +234,14 @@ namespace zxorm {
     struct IsJoinTrait {};
 
     template <typename T, join_type_t type = join_type_t::INNER>
-    struct Join : IsJoinTrait {};
+    struct Join : IsJoinTrait { };
 
     template <Field field_a, Field field_b, join_type_t type = join_type_t::INNER>
-    struct JoinOn : IsJoinTrait {};
+    struct JoinOn : IsJoinTrait { };
 
     template <typename T>
     static constexpr bool is_join = std::is_base_of_v<IsJoinTrait, T>;
 
+    template <typename T>
+    struct From {};
 };

@@ -567,6 +567,56 @@ TEST_F(QueryTest, All)
     ASSERT_EQ(vec.value().size(), 6);
 }
 
+TEST_F(QueryTest, SelectFrom)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->select_query<Select<Object>, From<Object>>().many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 6);
+}
+
+TEST_F(QueryTest, SelectWithoutFrom)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->select_query<Select<Object>>().many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 6);
+}
+
 TEST_F(QueryTest, OrderDesc)
 {
     Object obj;

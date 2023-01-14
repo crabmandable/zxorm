@@ -100,7 +100,8 @@ namespace zxorm {
         static auto read_row(Statement& s) -> Result<return_t>
         {
             if constexpr (!is_multi_table_select) {
-                return Select::from_t::get_row(s);
+                using row_t = std::tuple_element_t<0, typename Select::tables_t>;
+                return row_t::get_row(s);
             } else {
                 auto us_res = std::apply([&](const auto&... a) {
                     auto get_row = [&](const auto& pair) {
