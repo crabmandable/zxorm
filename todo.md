@@ -1,7 +1,5 @@
 Note to self: start from top
 
-* Allow string_view to be used for bindings & columns
-
 * Enforce type safety for where expressions
 
 * Count with query

@@ -6,6 +6,7 @@ namespace zxorm {
     template<typename Container>
     struct is_multi_value_binding : std::bool_constant<
         not traits::is_basic_string<Container>::value &&
+        not traits::is_basic_string_view<Container>::value &&
             is_indexable_container<Container>::value
     >{};
 
@@ -68,6 +69,30 @@ namespace zxorm {
 
         template <typename M=void>
         requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::LIKE, std::string_view> like(std::string_view value) {
+            return value;
+        }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::NOT_LIKE, std::string_view> not_like(std::string_view value) {
+            return value;
+        }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::LIKE, std::string> like(const char* value) {
+            return std::string(value);
+        }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::NOT_LIKE, std::string> not_like(const char* value) {
+            return std::string(value);
+        }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
         ColumnExpression<Table, column_t, comparison_op_t::GLOB, std::string> glob(std::string value) {
             return value;
         }
@@ -77,6 +102,32 @@ namespace zxorm {
         ColumnExpression<Table, column_t, comparison_op_t::NOT_GLOB, std::string> not_glob(std::string value) {
             return value;
         }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::GLOB, std::string_view> glob(std::string_view value) {
+            return value;
+        }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::NOT_GLOB, std::string_view> not_glob(std::string_view value) {
+            return value;
+        }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::GLOB, std::string> glob(const char* value) {
+            return std::string(value);
+        }
+
+        template <typename M=void>
+        requires (column_t::sql_column_type == sqlite_column_type::TEXT)
+        ColumnExpression<Table, column_t, comparison_op_t::NOT_GLOB, std::string> not_glob(const char* value) {
+            return std::string(value);
+        }
+
+
 
         template <typename Container>
         requires(is_multi_value_binding<Container>::value)

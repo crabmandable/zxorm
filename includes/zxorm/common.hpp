@@ -88,6 +88,11 @@ namespace zxorm {
         struct is_basic_string<std::basic_string<CharT, Traits, Allocator>> : std::true_type {};
 
         template<typename T>
+        struct is_basic_string_view : std::false_type  { };
+        template<typename CharT, typename Traits>
+        struct is_basic_string_view<std::basic_string_view<CharT, Traits>> : std::true_type {};
+
+        template<typename T>
         struct is_array : std::false_type  { };
         template<typename T, auto s>
         struct is_array<std::array<T, s>> : std::true_type {};
@@ -96,14 +101,13 @@ namespace zxorm {
         struct is_optional : std::false_type  { };
         template<typename T>
         struct is_optional<std::optional<T>> : std::true_type {};
-
     }
 
     namespace ignore_qualifiers {
         template<typename T>
         static constexpr bool is_continuous_container() {
             using plain = typename remove_optional<std::remove_cvref_t<T>>::type;
-            return traits::is_vector<plain>() || traits::is_basic_string<plain>() || traits::is_array<plain>();
+            return traits::is_vector<plain>() || traits::is_basic_string<plain>() || traits::is_array<plain>() || traits::is_basic_string_view<plain>();
         }
 
         template<typename T>

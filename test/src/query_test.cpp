@@ -872,3 +872,54 @@ TEST_F(QueryTest, Truncate)
     ASSERT_FALSE(undeleted.is_error());
     ASSERT_EQ(0, undeleted.value().size());
 }
+
+TEST_F(QueryTest, BindStringView) {
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = "something else";
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    std::string_view search = "hello%";
+
+    auto result = my_conn->select_query<Object>()
+        .where(table_t::field<"text">.like(search))
+        .many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 4);
+}
+
+TEST_F(QueryTest, BindStringViewVector)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    auto search = std::vector<std::string_view>{"hello1", "hello2"};
+
+    auto result = my_conn->select_query<Object>()
+        .where(table_t::field<"text">.in(search))
+        .many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 2);
+}
