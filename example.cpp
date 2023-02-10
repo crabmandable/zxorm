@@ -3,9 +3,16 @@
  *    g++ example.cpp -Iincludes -o example.bin `pkg-config --libs sqlite3` -std=c++20
  */
 #include "zxorm/zxorm.hpp"
+#include <iomanip>
 
 using namespace zxorm;
 
+/**
+ * Student - This is the "Object" in ORM for this example
+ *
+ *           Nothing special goin on here, just a class/struct
+ *           that represents a row in our db table
+ */
 struct Student {
     enum Year {
         Freshman = 1,
@@ -20,11 +27,21 @@ struct Student {
 
     std::string name;
 
-    // newly enrolled students don't have a GPA yet,
-    // hence it is optional
+    // newly enrolled students don't have a GPA yet, hence it is optional
+    // optional will mean that the inferred SQL type is allowed to be NULL
     std::optional<float> gpa;
 };
 
+/**
+ * StudentTable - This typedef is the "schema" for the table 'students'
+ *
+ *                Using `zxorm::Table`, it tells zxorm how to map each column
+ *                onto the struct `Student`.
+ *
+ *                The type of each column is inferred by the type of the member.
+ *
+ *                Column constraints are also added here
+ */
 using StudentTable = Table<"students", Student,
     Column<"id", &Student::id, PrimaryKey<>>,
     Column<"name", &Student::name>,
@@ -34,6 +51,7 @@ using StudentTable = Table<"students", Student,
 
 
 int main (void) {
+    // Pass all the tables that are part of our schema to the connection object
     auto maybe_connection = Connection<StudentTable>::create("school.db");
 
     // most zxorm functions return a `zxorm::Result` template, that must be unwrapped
@@ -55,6 +73,9 @@ int main (void) {
      *     `gpa` REAL
      * );
      */
+
+    // Clear out any old data
+    connection.truncate<Student>();
 
     // and now we can start saving some students
     auto newStudent = Student();
@@ -80,21 +101,28 @@ int main (void) {
         throw std::runtime_error("Couldn't find zach");
     }
 
+    using Year = Student::Year;
+
     connection.insert_many_records(std::vector<Student> {
-        { .year = Student::Year::Freshman, .name = "jojo", .gpa = 3.44 },
-        { .year = Student::Year::Sophmore, .name = "janet", .gpa = 2.4 },
-        { .year = Student::Year::Sophmore, .name = "bob", .gpa = 3.9 },
-        { .year = Student::Year::Senior, .name = "billie", .gpa = 3.95 },
-        { .year = Student::Year::Senior, .name = "wayne", .gpa = 2.98 },
+        { .year = Year::Freshman, .name = "jojo",   .gpa = 3.44 },
+        { .year = Year::Sophmore, .name = "janet",  .gpa = 2.4  },
+        { .year = Year::Sophmore, .name = "bob",    .gpa = 3.9  },
+        { .year = Year::Senior,   .name = "billie", .gpa = 3.95 },
+        { .year = Year::Senior,   .name = "wayne",  .gpa = 2.98 },
     });
+
+    constexpr auto PASS_GPA = 3.0f;
 
     // find many records with a more complicated WHERE clause
     auto students = connection.select_query<Student>()
-        .where(StudentTable::field<"gpa"> >= 3.0 &&
-               StudentTable::field<"year"> >= Student::Year::Sophmore)
+        .where(StudentTable::field<"gpa"> >= PASS_GPA &&
+               StudentTable::field<"year"> >= Year::Sophmore)
         .many();
 
-    std::cout << "passing students:\n";
+    std::cout << "Students who have a passing GPA >= "
+        << std::fixed << std::setprecision(1) << PASS_GPA
+        << ":\n";
+
     for (const Result<Student>& student: students.value()) {
         std::cout << "\t" << student.value().name << "\n";
     }
