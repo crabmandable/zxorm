@@ -1,10 +1,10 @@
 Note to self: start from top
 
-* Enforce type safety for where expressions
-
 * Count with query
 
-* Allow using string names, or table classes instead of only objects for query methods
+* Group by
+
+* Enforce type safety for where expressions
 
 * Statement caching
 

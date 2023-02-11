@@ -4,12 +4,11 @@
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/orm/query/clause.hpp"
-#include "zxorm/orm/field.hpp"
 #include <sqlite3.h>
 
 namespace zxorm {
 
-    template <typename Table, typename ColumnClause, typename... Joins>
+    template <typename Table, typename ColumnClause, typename GroupBy=void, typename JoinsTuple=std::tuple<>>
     class Query {
     protected:
         const char* _table_name = Table::name.value;
@@ -26,10 +25,16 @@ namespace zxorm {
             ss << ColumnClause();
             ss << "FROM `" << _table_name << "` ";
 
-            ((ss << Joins{} << " "), ...);
+            std::apply([&](const auto&... j) {
+                ((ss << j << " "), ...);
+            }, JoinsTuple{});
 
             if (_where) {
                 ss << _where->clause << " ";
+            }
+
+            if constexpr (not std::is_void_v<GroupBy>) {
+                ss << GroupBy{} << " ";
             }
 
             serialize_limits(ss);

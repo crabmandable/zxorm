@@ -94,7 +94,7 @@ int main (void) {
 
     // find a record by some other column
     auto zach = connection.select_query<Student>()
-        .where(StudentTable::field<"name">.like("zach"))
+        .where(StudentTable::field_t<"name">().like("zach"))
         .one();
 
     if (zach.is_error() || !zach.has_value()) {
@@ -115,8 +115,8 @@ int main (void) {
 
     // find many records with a more complicated WHERE clause
     auto students = connection.select_query<Student>()
-        .where(StudentTable::field<"gpa"> >= PASS_GPA &&
-               StudentTable::field<"year"> >= Year::Sophmore)
+        .where(StudentTable::field_t<"gpa">() >= PASS_GPA &&
+               StudentTable::field_t<"year">() >= Year::Sophmore)
         .many();
 
     std::cout << "Students who have a passing GPA >= "

@@ -13,7 +13,7 @@ namespace zxorm {
             }
         };
     };
-    template <class From, typename... Joins>
+    template <class From>
     class DeleteQuery : public Query<From, __delete_detail::DeleteColumnClause> {
     using Super = Query<From, __delete_detail::DeleteColumnClause>;
 

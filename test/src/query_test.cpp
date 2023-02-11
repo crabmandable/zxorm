@@ -188,7 +188,7 @@ TEST_F(QueryTest, WhereEq)
 
     auto err = my_conn->insert_record(obj);
     ASSERT_FALSE(err);
-    auto result = my_conn->select_query<Object>().where(table_t::field<"some_id"> == 42).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"some_id">() == 42).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
@@ -225,7 +225,7 @@ TEST_F(QueryTest, WhereEq)
 
 TEST_F(QueryTest, WhereFindNothing)
 {
-    auto result = my_conn->select_query<Object>().where(table_t::field<"some_id"> == 42).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"some_id">() == 42).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
@@ -245,7 +245,7 @@ TEST_F(QueryTest, WhereFindMany)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"some_id"> == 42).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"some_id">() == 42).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
 
@@ -265,9 +265,9 @@ TEST_F(QueryTest, WhereEqOrEq)
     }
 
     auto result = my_conn->select_query<Object>().where(
-            table_t::field<"some_id"> == 0 ||
-            table_t::field<"some_id"> == 1 ||
-            table_t::field<"some_id"> == 2).many();
+            table_t::field_t<"some_id">() == 0 ||
+            table_t::field_t<"some_id">() == 1 ||
+            table_t::field_t<"some_id">() == 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -287,7 +287,7 @@ TEST_F(QueryTest, WhereNe)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"some_id"> != 0).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"some_id">() != 0).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -308,8 +308,8 @@ TEST_F(QueryTest, WhereNeAndNe)
     }
 
     auto result = my_conn->select_query<Object>().where(
-            table_t::field<"some_id"> != 0 &&
-            table_t::field<"id"> != 2).many();
+            table_t::field_t<"some_id">() != 0 &&
+            table_t::field_t<"id">() != 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -329,7 +329,7 @@ TEST_F(QueryTest, WhereLt)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"id"> < 2).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"id">() < 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -349,7 +349,7 @@ TEST_F(QueryTest, WhereLte)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"id"> <= 2).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"id">() <= 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -369,7 +369,7 @@ TEST_F(QueryTest, WhereGt)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"id"> > 2).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"id">() > 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -389,7 +389,7 @@ TEST_F(QueryTest, WhereGte)
         ASSERT_FALSE(err);
     }
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"id"> >= 2).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"id">() >= 2).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -412,7 +412,7 @@ TEST_F(QueryTest, WhereLike)
     obj.some_text = std::string("helllo4");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"text">.like(std::string("hello_"))).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"text">().like(std::string("hello_"))).many();
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
     auto iter = result.value();
@@ -435,7 +435,7 @@ TEST_F(QueryTest, WhereNotLike)
     obj.some_text = std::string("helllo4");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"text">.not_like("hello_")).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"text">().not_like("hello_")).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -458,7 +458,7 @@ TEST_F(QueryTest, WhereGlob)
     obj.some_text = std::string("helllo4");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"text">.glob("hello*")).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"text">().glob("hello*")).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -483,7 +483,7 @@ TEST_F(QueryTest, WhereNotGlob)
     obj.some_text = std::string("h5");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"text">.not_glob("hell*")).many();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"text">().not_glob("hell*")).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -506,7 +506,7 @@ TEST_F(QueryTest, WhereIn)
     auto search = std::vector<std::string>{"hello1", "hello2"};
 
     auto result = my_conn->select_query<Object>()
-        .where(table_t::field<"text">.in(search))
+        .where(table_t::field_t<"text">().in(search))
         .many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
@@ -530,7 +530,7 @@ TEST_F(QueryTest, WhereNotIn)
     auto search = std::array<std::string, 2>{"hello1", "hello2"};
 
     auto result = my_conn->select_query<Object>()
-        .where(table_t::field<"text">.not_in(search))
+        .where(table_t::field_t<"text">().not_in(search))
         .many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
@@ -716,7 +716,7 @@ TEST_F(QueryTest, EmptyOne)
     obj.some_text = std::string("h5");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->select_query<Object>().where(table_t::field<"id"> > 10).one();
+    auto result = my_conn->select_query<Object>().where(table_t::field_t<"id">() > 10).one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -836,7 +836,7 @@ TEST_F(QueryTest, DeleteWhere)
     auto err = my_conn->insert_many_records(objects);
     ASSERT_FALSE(err);
 
-    err = my_conn->delete_query<Object>().where(table_t::field<"float"> >= (100.0 * 3.14)).exec();
+    err = my_conn->delete_query<Object>().where(table_t::field_t<"float">() >= (100.0 * 3.14)).exec();
     ASSERT_FALSE(err);
 
     auto result = my_conn->select_query<Object>().many();
@@ -888,7 +888,7 @@ TEST_F(QueryTest, BindStringView) {
     std::string_view search = "hello%";
 
     auto result = my_conn->select_query<Object>()
-        .where(table_t::field<"text">.like(search))
+        .where(table_t::field_t<"text">().like(search))
         .many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
@@ -912,7 +912,7 @@ TEST_F(QueryTest, BindStringViewVector)
     auto search = std::vector<std::string_view>{"hello1", "hello2"};
 
     auto result = my_conn->select_query<Object>()
-        .where(table_t::field<"text">.in(search))
+        .where(table_t::field_t<"text">().in(search))
         .many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
@@ -922,4 +922,42 @@ TEST_F(QueryTest, BindStringViewVector)
     auto vec = iter.to_vector();
     ASSERT_FALSE(vec.is_error());
     ASSERT_EQ(vec.value().size(), 2);
+}
+
+TEST_F(QueryTest, SelectAColumn)
+{
+    std::vector<Object> objs;
+    objs.resize(4);
+    auto err = my_conn->insert_many_records(objs);
+    ASSERT_FALSE(err);
+
+    auto result = my_conn->select_query<table_t::field_t<"id">>().order_by<"id">(order_t::DESC).one();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result.value(), 4);
+}
+
+TEST_F(QueryTest, SelectSeveralColumns)
+{
+    Object obj;
+    obj.some_text = "yes";
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    auto result = my_conn->select_query<
+        Select<table_t::field_t<"id">, table_t::field_t<"text">>
+    >().order_by<"id">(order_t::DESC).one();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    ASSERT_TRUE(result.has_value());
+    int id = std::get<0>(result.value());
+    ASSERT_EQ(1, id);
+
+    std::string text = std::get<1>(result.value());
+    ASSERT_EQ(text, "yes");
 }

@@ -112,19 +112,18 @@ class Table {
         static constexpr bool does_reference_table = __foreign_key_detail::index_of_foreign_table<foreign_table, foreign_columns_t>::value >= 0;
 
         static void print_foreign_keys() {
-            std::apply([&](const auto&... a) {
+            std::apply([&]<typename... U>(const U&...) {
                 ([&]() {
-                    using column_t = std::remove_reference_t<decltype(a)>;
-                    std::cout << "column: " << column_t::name.value << std::endl;
+                    std::cout << "column: " << U::name.value << std::endl;
                     std::cout << "foreign key: " << std::endl;
-                    using fk_t = typename column_t::foreign_key_t;
+                    using fk_t = typename U::foreign_key_t;
                     std::cout << "\t" << fk_t::table_name.value << "," << fk_t::column_name.value << std::endl;
                 }(), ...);
             }, foreign_columns_t{});
         }
 
         template <FixedLengthString name>
-        static inline Field<Table, name> field = Field<Table, name>();
+        using field_t = Field<Table, name>;
 
         static constexpr auto name = table_name;
 
@@ -159,15 +158,14 @@ class Table {
             // used to tell us when to insert a NULL for the auto increment column
             bool auto_inc_idx = -1;
 
-            std::apply([&](const auto&... a) {
+            std::apply([&]<typename... U>(const U&...) {
                 int i = 0;
                 ([&]() {
-                    using column_t = std::remove_reference_t<decltype(a)>;
-                    if constexpr (column_t::is_auto_inc_column) {
+                    if constexpr (U::is_auto_inc_column) {
                         auto_inc_idx = i;
                     }
 
-                    ss << "`" << column_t::name.value << "`, ";
+                    ss << "`" << U::name.value << "`, ";
                     i++;
                 }(), ...);
             }, columns_t{});
@@ -202,11 +200,10 @@ class Table {
             std::ostringstream ss;
             ss << "UPDATE `" << table_name.value << "` SET ";
 
-            std::apply([&](const auto&... a) {
+            std::apply([&]<typename... U>(const U&...) {
                 ([&]() {
-                    using column_t = std::remove_reference_t<decltype(a)>;
-                    if constexpr (not column_t::is_primary_key) {
-                        ss << "`" << column_t::name.value << "` = ?, ";
+                    if constexpr (not U::is_primary_key) {
+                        ss << "`" << U::name.value << "` = ?, ";
                     }
                 }(), ...);
             }, columns_t{});
@@ -227,17 +224,16 @@ class Table {
             T record;
             size_t column_idx = column_offset;
             OptionalError err;
-            std::apply([&](const auto&... a) {
+            std::apply([&]<typename... U>(const U&...) {
                 ([&]() {
                     if (err) return;
-                    using column_t = std::remove_reference_t<decltype(a)>;
-                    if constexpr (column_t::public_column) {
-                        err = stmt.read_column(column_idx++, column_t::getter(record));
+                    if constexpr (U::public_column) {
+                        err = stmt.read_column(column_idx++, U::getter(record));
                     } else {
-                        using value_t = typename column_t::member_t;
+                        using value_t = typename U::member_t;
                         value_t value;
                         err = stmt.read_column(column_idx++, value);
-                        column_t::setter(record, value);
+                        U::setter(record, value);
                     }
                 }(), ...);
             }, columns_t{});

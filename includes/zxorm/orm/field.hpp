@@ -10,13 +10,18 @@ namespace zxorm {
             is_indexable_container<Container>::value
     >{};
 
+    struct IsFieldTrait {};
+
+    template <typename T>
+    static constexpr bool is_field = std::is_base_of_v<IsFieldTrait, T>;
+
     template <typename Table, FixedLengthString _name>
-    struct Field {
+    struct Field : IsFieldTrait {
         using column_t = typename Table::column_by_name<_name>::type;
         static_assert(not std::is_same_v<column_t, std::false_type>,
                 "No such field belonging to table");
 
-        static constexpr const char* name = _name.value;
+        static constexpr auto name = _name;
         using table_t = Table;
 
         template <ArithmeticT M>

@@ -6,11 +6,10 @@
 #include "zxorm/orm/record_iterator.hpp"
 
 namespace zxorm {
-    template <typename Select, typename... Joins>
-    class SelectQuery : public Query<typename Select::from_t, Select, Joins...> {
+    template <typename Select, typename GroupBy=void, typename JoinsTuple=std::tuple<>>
+    class SelectQuery : public Query<typename Select::from_t, Select, GroupBy, JoinsTuple> {
     private:
-        using Super = Query<typename Select::from_t, Select, Joins...>;
-        static constexpr bool is_multi_table_select = std::tuple_size_v<typename Select::tables_t> > 1;
+        using Super = Query<typename Select::from_t, Select, GroupBy, JoinsTuple>;
 
         std::string _limit_clause;
         std::string _order_clause;
@@ -52,9 +51,13 @@ namespace zxorm {
                 return 1 + find_index_of_type<Target, ListTails...>();
         }
 
-        // unused base case
+        /**
+         * with_offsets - metafunction that transforms the selections into
+         *                `ColumnOffset`s that include the offset to read from
+         *                when loading each row of query results
+         */
         template <typename T>
-        struct with_offsets : std::false_type {};
+        struct with_offsets : std::false_type {}; // unused base case
 
         template <typename... T>
         struct with_offsets <std::tuple<T...>> {
@@ -71,19 +74,10 @@ namespace zxorm {
 
         using return_t = typename Select::return_t;
 
-        // unused base case
-        template <typename T>
-        struct result_tuple : std::false_type {};
-
-        template <typename... T>
-        struct result_tuple <std::tuple<T...>> : std::type_identity<
-            std::tuple<OptionalResult<typename T::object_class>...>
-        > {};
-
-        using result_tuple_t = typename result_tuple<typename Select::tables_t>::type;
+        using result_tuple_t = typename Select::result_t;
 
         template<size_t record_index, typename T>
-        requires (Select::is_optional[record_index])
+        requires (std::tuple_element_t<record_index, typename Select::selections_tuple>::is_optional)
         static auto row_res_to_row (const OptionalResult<T>& row_res) -> std::optional<T> {
             if (row_res.has_value()) {
                 return row_res.value();
@@ -99,25 +93,22 @@ namespace zxorm {
 
         static auto read_row(Statement& s) -> Result<return_t>
         {
-            if constexpr (!is_multi_table_select) {
-                using row_t = std::tuple_element_t<0, typename Select::tables_t>;
-                return row_t::get_row(s);
+            if constexpr (std::tuple_size_v<typename Select::selections_tuple> == 1) {
+                using selection = std::tuple_element_t<0, typename Select::selections_tuple>;
+                return selection::get_row(s);
             } else {
                 auto us_res = std::apply([&](const auto&... a) {
-                    auto get_row = [&](const auto& pair) {
-                        using pair_t = std::remove_reference_t<decltype(pair)>;
-                        using table_t = pair_t::type;
-                        using row_t = OptionalResult<typename table_t::object_class>;
+                    auto get_row = [&]<typename Pair>(const Pair&) {
+                        // The pair here is a ColumnOffset template
+                        using selection_t = Pair::type;
+                        using row_t = typename selection_t::result_t;
 
-                        constexpr size_t offset = pair_t::offset;
-                        auto row = table_t::get_row(s, offset);
+                        constexpr size_t offset = Pair::offset;
+                        auto row = selection_t::get_row(s, offset);
 
                         if (row.is_error()) return row_t{std::move(row)};
 
-                        // NULL primary key means the record is NULL
-                        // which can happen depending on joins
-                        if (Select::is_optional[tuple_index<table_t, typename Select::tables_t>::value] &&
-                                not table_t::primary_key_t::getter(row.value()))
+                        if (selection_t::row_is_null(row.value()))
                         {
                             return row_t{std::nullopt};
                         }
@@ -129,7 +120,7 @@ namespace zxorm {
                     return result_tuple_t {
                         get_row(a)...
                     };
-                }, with_offsets_t<typename Select::tables_t>{});
+                }, with_offsets_t<typename Select::selections_tuple>{});
 
 
                 OptionalResult<return_t> us = std::nullopt;
@@ -173,7 +164,7 @@ namespace zxorm {
         }
 
         template <FixedLengthString field>
-        auto order_by(order_t ord) {
+        auto order_by(order_t ord = order_t::ASC) {
             static_assert(not std::is_same_v<typename Select::from_t::column_by_name<field>::type, std::false_type>,
                 "ORDER BY clause must use a field beloning to the Table"
             );
