@@ -104,11 +104,15 @@ int main (void) {
     using Year = Student::Year;
 
     connection.insert_many_records(std::vector<Student> {
-        { .year = Year::Freshman, .name = "jojo",   .gpa = 3.44 },
-        { .year = Year::Sophmore, .name = "janet",  .gpa = 2.4  },
-        { .year = Year::Sophmore, .name = "bob",    .gpa = 3.9  },
-        { .year = Year::Senior,   .name = "billie", .gpa = 3.95 },
-        { .year = Year::Senior,   .name = "wayne",  .gpa = 2.98 },
+        { .year = Year::Freshman, .name = "jojo",    .gpa = 3.44 },
+        { .year = Year::Sophmore, .name = "janet",   .gpa = 2.4  },
+        { .year = Year::Sophmore, .name = "bob",     .gpa = 3.9  },
+        { .year = Year::Senior,   .name = "billie",  .gpa = 3.95 },
+        { .year = Year::Senior,   .name = "wayne",   .gpa = 2.98 },
+        { .year = Year::Freshman, .name = "charlie", .gpa = 1.3 },
+        { .year = Year::Senior,   .name = "mac",     .gpa = 1.0 },
+        { .year = Year::Senior,   .name = "dee",     .gpa = 2.99 },
+        { .year = Year::Senior,   .name = "dennis",  .gpa = 3.1 },
     });
 
     constexpr auto PASS_GPA = 3.0f;
@@ -125,5 +129,27 @@ int main (void) {
 
     for (const Result<Student>& student: students.value()) {
         std::cout << "\t" << student.value().name << "\n";
+    }
+
+    // simple count query
+    auto n_failing = connection.select_query<CountAll, From<Student>>()
+        .where(StudentTable::field_t<"gpa">() < PASS_GPA)
+        .one();
+
+    std::cout << "There are " << n_failing.value() << " failing students in all years\n";
+
+
+    // more complicated counting using a GroupBy clause
+    auto count_result = connection.select_query<
+        Select<Count<Student>, StudentTable::field_t<"year">>,
+        GroupBy<StudentTable::field_t<"year">>
+    >().many();
+
+    for (const auto& row : count_result.value()) {
+        // each row will be represented by a tuple, according to the `Select` clause
+        // here, the first element will be the count column,
+        // and the second element will be the year
+        std::cout << "There are " << std::get<0>(row.value()) << " students "
+            "in year " << std::get<1>(row.value()) << "\n";
     }
 }
