@@ -401,11 +401,4 @@ namespace zxorm {
             return out;
         }
     };
-
-    // unwrap the user facing template
-    template <typename T>
-    struct __group_by_impl<GroupBy<T>> : __group_by_impl<T> {};
-    // unwrap tuple and use first element
-    template <typename Head, typename... Tails>
-    struct __group_by_impl<std::tuple<Head, Tails...>> : __group_by_impl<Head> {};
 };

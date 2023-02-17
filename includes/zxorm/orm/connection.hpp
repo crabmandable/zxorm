@@ -50,6 +50,9 @@ namespace zxorm {
         template <typename JoinedTables, typename JoinedClauses, typename Last=void, typename... T>
         struct make_joins;
 
+        template<typename T>
+        struct make_group_by;
+
         template <typename selectables_tuple, typename T>
         struct selections_are_selectable;
 
@@ -476,6 +479,29 @@ namespace zxorm {
     static constexpr bool select_starts_with_count_all<Select<CountAll, U...>> = true;
 
     template <class... Table>
+    template<typename T>
+    struct Connection<Table...>::make_group_by : std::type_identity<std::conditional_t<is_field<T>,
+        __group_by_impl<T>,
+        __group_by_impl<table_for_class_t<T>>
+    >>{};
+
+    // unwrap user facing template
+    template <class... Table>
+    template<typename T>
+    struct Connection<Table...>::make_group_by<GroupBy<T>> : std::type_identity<typename make_group_by<T>::type> {};
+
+    // unwrap tuple and use first element
+    template <class... Table>
+    template <typename Head, typename... Tails>
+    struct Connection<Table...>::make_group_by<std::tuple<Head, Tails...>> : std::type_identity<typename make_group_by<Head>::type> {};
+
+    // empty tuple case
+    template <class... Table>
+    template <typename T>
+    requires(std::is_same_v<std::tuple<>, T>)
+    struct Connection<Table...>::make_group_by<T> : std::type_identity<void> {};
+
+    template <class... Table>
     template<typename SelectOrTable, typename From, typename... Clauses>
     auto Connection<Table...>::make_select_query()
     {
@@ -535,10 +561,7 @@ namespace zxorm {
                 "Only a single `GroupBy` clause should be used in a query");
         static constexpr bool group_by_present = std::tuple_size_v<group_bys_tuple_t> == 1;
 
-        using group_by_t = std::conditional_t<group_by_present,
-              __group_by_impl<group_bys_tuple_t>,
-              void
-        >;
+        using group_by_t = typename make_group_by<group_bys_tuple_t>::type;
 
         // if we have joins in the query, handle them here:
         if constexpr (std::tuple_size_v<joins_t>)

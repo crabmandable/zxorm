@@ -205,3 +205,70 @@ TEST_F(CountQueryTest, CountWithGroupBy) {
     text = std::get<1>(row2);
     ASSERT_EQ(text, "goodbye");
 }
+
+TEST_F(CountQueryTest, CountDistinct) {
+    Object1 obj = { .text = "hello" };
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    obj = { .text = "goodbye" };
+    err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    for (int i = 0; i < 10; i++) {
+        Object2 obj = { .obj1_id = i % 2 ? 1 : 2 };
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    auto result = my_conn->select_query<CountDistinct<table2::field_t<"obj1_id">>>().one();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+    ASSERT_TRUE(result.has_value());
+
+    ASSERT_EQ(2, result.value());
+}
+
+TEST_F(CountQueryTest, CountWithJoin) {
+    Object1 obj = { .text = "hello" };
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    obj = { .text = "goodbye" };
+    err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    for (int i = 0; i < 10; i++) {
+        Object2 obj = { .obj1_id = i % 2 ? 1 : 2 };
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    auto results = my_conn->select_query<
+        Select<Count<Object2>, table1::field_t<"text">>,
+        From<Object1>,
+        JoinOn<table1::field_t<"id">, table2::field_t<"obj1_id">>,
+        GroupBy<Object1>
+    >().many();
+
+    if (results.is_error()) std::cout << results.error() << std::endl;
+    ASSERT_FALSE(results.is_error());
+
+    auto data = results.value().to_vector();
+    ASSERT_FALSE(data.is_error());
+    auto rows = std::move(data.value());
+    ASSERT_EQ(rows.size(), 2);
+
+    auto row1 = rows[0];
+    size_t count = std::get<0>(row1);
+    ASSERT_EQ(count, 5);
+    std::string text = std::get<1>(row1);
+    ASSERT_EQ(text, "hello");
+
+    auto row2 = rows[1];
+    count = std::get<0>(row2);
+    ASSERT_EQ(count, 5);
+    text = std::get<1>(row2);
+    ASSERT_EQ(text, "goodbye");
+}
