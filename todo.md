@@ -5,12 +5,9 @@ Note to self: start from top
 
 * BUG: Order doesn't make sense, needs to take in a field instead of a string name
 
-* BUG: count query returns optional because `one` is always optional
-
-* BUG: `Join` should allow automatically joining by foreign key if the foreign key
-    is on the join table, instead of the `From` table
-
 * Docs
+
+* Reorganize code - need to split `clause` up, and try to clean up `connection`
 
 * Enforce type safety for where expressions
 

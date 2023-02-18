@@ -258,7 +258,7 @@ namespace zxorm {
         static constexpr auto table_name = _table_name;
     };
 
-    template <FixedLengthString foreign_table, join_type_t type, typename AlreadyJoinedTuple>
+    template <typename TableToJoin, join_type_t type, typename AlreadyJoinedTuple>
     struct __join_impl {
         static constexpr join_type_t join_type = type;
 
@@ -266,38 +266,70 @@ namespace zxorm {
         struct referenced_by_one_of : std::false_type {};
 
         template <typename... T>
-        struct referenced_by_one_of<std::tuple<T...>> : std::bool_constant<any_of<T::template does_reference_table<foreign_table>...>> {};
+        struct referenced_by_one_of<std::tuple<T...>> : std::bool_constant<any_of<
+            (TableToJoin::template does_reference_table<T::name> || T::template does_reference_table<TableToJoin::name>)...
+        >> {};
 
         static_assert(referenced_by_one_of<AlreadyJoinedTuple>::value,
                 "The queried tables do not contain a foreign key referencing this table");
 
         template <typename T>
-        struct index_of_table { static constexpr int value = -1; };
+        struct joined_table_meta {};
 
         template <typename... T>
-        struct index_of_table<std::tuple<T...>> {
-            static constexpr int value = index_of_first<T::template does_reference_table<foreign_table>...>::value;
+        struct joined_table_meta<std::tuple<T...>> {
+        private:
+            static constexpr bool fk_is_already_joined() {
+                int idx = index_of_first<T::template does_reference_table<TableToJoin::name>...>::value;
+                return idx < 0;
+            }
+
+            static constexpr bool index() {
+                int idx = index_of_first<T::template does_reference_table<TableToJoin::name>...>::value;
+                if (idx < 0)
+                    idx = index_of_first<TableToJoin::template does_reference_table<T::name>...>::value;
+
+                return idx;
+            }
+
+        public:
+            static constexpr int refers_to_index = index();
+            using other_table_t = std::tuple_element_t<refers_to_index, std::tuple<T...>>;
+
+            static constexpr const char* other_column_name() {
+                if constexpr(fk_is_already_joined()) {
+                    return TableToJoin::template foreign_column<other_table_t::name>::foreign_key_t::column_name.value;
+                } else {
+                    return other_table_t::template foreign_column<TableToJoin::name>::name.value;
+                }
+            }
+
+            static constexpr const char* column_name() {
+                if constexpr (fk_is_already_joined()) {
+                    return TableToJoin::template foreign_column<other_table_t::name>::name.value;
+                } else {
+                    return other_table_t::template foreign_column<TableToJoin::name>::foreign_key_t::column_name.value;
+                }
+            }
         };
 
-        using table_t = std::tuple_element_t<index_of_table<AlreadyJoinedTuple>::value, AlreadyJoinedTuple>;
+        using joined_meta_t = joined_table_meta<AlreadyJoinedTuple>;
+        using other_table_t = typename joined_meta_t::other_table_t;
 
-        static constexpr bool is_nested = index_of_table<AlreadyJoinedTuple>::value > 0;
+        static constexpr bool is_nested = joined_meta_t::refers_to_index > 0;
 
-        using select_column = typename table_t::foreign_column<foreign_table>;
-        using foreign_key_t = typename select_column::foreign_key_t;
-
-        static constexpr auto right_table_name = foreign_key_t::table_name;
-        static constexpr auto left_table_name = table_t::name;
+        static constexpr auto right_table_name = TableToJoin::name;
+        static constexpr auto left_table_name = other_table_t::name;
 
         using selectables_tuple = std::tuple<
             __joined_table<left_is_optional(type), left_table_name>,
             __joined_table<right_is_optional(type), right_table_name>
         >;
 
-        friend std::ostream & operator<< (std::ostream &out, const __join_impl<foreign_table, type, AlreadyJoinedTuple>&) {
-            out << type << "`" << foreign_key_t::table_name.value << "`"
-                << " ON `" << table_t::name.value << "`.`" << select_column::name.value << "`"
-                << " = `" << foreign_key_t::table_name.value << "`.`" << foreign_key_t::column_name.value << "`";
+        friend std::ostream & operator<< (std::ostream &out, const __join_impl<TableToJoin, type, AlreadyJoinedTuple>&) {
+            out << type << "`" << TableToJoin::name.value << "`"
+                << " ON `" << other_table_t::name.value << "`.`" << joined_meta_t::other_column_name() << "`"
+                << " = `" << TableToJoin::name.value << "`.`" << joined_meta_t::column_name() << "`";
 
             return out;
         }

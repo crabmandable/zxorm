@@ -51,12 +51,16 @@ namespace zxorm {
         };
 
         template <FixedLengthString foreign_table, typename foreign_key_tuple>
+        struct column_with_reference {};
+
+        template <FixedLengthString foreign_table, typename foreign_key_tuple>
         requires (index_of_foreign_table<foreign_table, foreign_key_tuple>::value >= 0)
-        using column_with_reference_t = decltype(
-            std::get<index_of_foreign_table<foreign_table, foreign_key_tuple>::value>(
-                foreign_key_tuple{}
-            )
-        );
+        struct column_with_reference<foreign_table, foreign_key_tuple> : std::type_identity<
+            std::tuple_element_t<index_of_foreign_table<foreign_table, foreign_key_tuple>::value, foreign_key_tuple>
+        > {};
+
+        template <FixedLengthString foreign_table, typename foreign_key_tuple>
+        using column_with_reference_t = typename column_with_reference<foreign_table, foreign_key_tuple>::type;
     };
 
 template <FixedLengthString table_name, class T, class... Column>
@@ -105,11 +109,12 @@ class Table {
 
         using foreign_columns_t = __foreign_key_detail::foreign_only_t<Column...>;
 
-        template <FixedLengthString foreign_table>
-        using foreign_column = std::remove_reference_t<__foreign_key_detail::column_with_reference_t<foreign_table, foreign_columns_t>>;
 
         template <FixedLengthString foreign_table>
         static constexpr bool does_reference_table = __foreign_key_detail::index_of_foreign_table<foreign_table, foreign_columns_t>::value >= 0;
+
+        template <FixedLengthString foreign_table>
+        using foreign_column = std::remove_reference_t<__foreign_key_detail::column_with_reference_t<foreign_table, foreign_columns_t>>;
 
         static void print_foreign_keys() {
             std::apply([&]<typename... U>(const U&...) {

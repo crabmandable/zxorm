@@ -248,7 +248,7 @@ TEST_F(CountQueryTest, CountWithJoin) {
     auto results = my_conn->select_query<
         Select<Count<Object2>, table1::field_t<"text">>,
         From<Object1>,
-        JoinOn<table1::field_t<"id">, table2::field_t<"obj1_id">>,
+        Join<Object2>,
         GroupBy<Object1>
     >().many();
 

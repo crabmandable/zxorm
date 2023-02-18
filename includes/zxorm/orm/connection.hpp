@@ -352,7 +352,7 @@ namespace zxorm {
     template <class... Table>
     template <typename T, join_type_t type, typename OtherTablesTuple>
     struct Connection<Table...>::join_clause_type<Join<T, type>, OtherTablesTuple> : std::type_identity<
-        __join_impl<table_for_class_t<T>::name, type, OtherTablesTuple>
+        __join_impl<table_for_class_t<T>, type, OtherTablesTuple>
     >{};
 
     template <class... Table>
