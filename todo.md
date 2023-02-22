@@ -3,11 +3,11 @@ Note to self: start from top
 * More count tests:
     count with where
 
-* BUG: Order doesn't make sense, needs to take in a field instead of a string name
-
 * Docs
 
 * Reorganize code - need to split `clause` up, and try to clean up `connection`
+
+* Experiment with exceptions
 
 * Enforce type safety for where expressions
 

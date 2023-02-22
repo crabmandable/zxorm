@@ -595,6 +595,7 @@ namespace zxorm {
             // is too complicated
             static constexpr bool results_are_optional = query_is_nested && a_selection_is_optional<selectables_t>::value;
             return SelectQuery<
+                selectables_t,
                 typename select_type<results_are_optional, selectables_t, from_t, SelectOrTable>::type,
                 group_by_t,
                 joins_tuple>
@@ -613,7 +614,10 @@ namespace zxorm {
                         "`GroupBy` clause targets a table not present in the query.");
             }
 
-            return SelectQuery<typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type, group_by_t> (
+            // only the `from_t` is selectable since there are no joins
+            using selectables_t = std::tuple<__joined_table<false, table_for_class_t<from_t>::name>>;
+
+            return SelectQuery<selectables_t, typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type, group_by_t> (
                 _db_handle.get(),
                 _logger
             );
@@ -920,8 +924,8 @@ namespace zxorm {
     auto Connection<Table...>::last()
     {
         using table_t = table_for_class_t<T>;
-        constexpr auto pk_name = table_t::primary_key_t::name;
-        return make_select_query<T>().template order_by<pk_name>(order_t::DESC).one();
+        using pk_field = Field<table_t, table_t::primary_key_t::name>;
+        return make_select_query<T>().template order_by<pk_field>(order_t::DESC).one();
     }
 
     template <class... Table>

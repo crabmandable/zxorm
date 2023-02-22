@@ -183,7 +183,7 @@ TEST_F(CountQueryTest, CountWithGroupBy) {
         Select<CountAll, table1::field_t<"text">>,
         From<table1>,
         GroupBy<table1::field_t<"text">>
-    >().order_by<"text">(order_t::DESC).many();
+    >().order_by<table1::field_t<"text">>(order_t::DESC).many();
 
     if (results.is_error()) std::cout << results.error() << std::endl;
     ASSERT_FALSE(results.is_error());

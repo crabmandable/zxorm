@@ -6,7 +6,7 @@
 #include "zxorm/orm/record_iterator.hpp"
 
 namespace zxorm {
-    template <typename Select, typename GroupBy=void, typename JoinsTuple=std::tuple<>>
+    template <typename SelectablesTuple, typename Select, typename GroupBy=void, typename JoinsTuple=std::tuple<>>
     class SelectQuery : public Query<typename Select::from_t, Select, GroupBy, JoinsTuple> {
     private:
         using Super = Query<typename Select::from_t, Select, GroupBy, JoinsTuple>;
@@ -17,6 +17,14 @@ namespace zxorm {
         virtual void serialize_limits(std::ostream& ss) override {
             ss << _order_clause << " " << _limit_clause;
         }
+
+        template <typename T, typename U>
+        struct table_is_selectable {};
+
+        template <typename T, typename... U>
+        struct table_is_selectable<T, std::tuple<U...>> : std::bool_constant <
+           (... || (T::name == U::table_name))
+        > {};
 
         template <typename T, size_t s>
         struct ColumnOffset{
@@ -163,13 +171,17 @@ namespace zxorm {
             return *this;
         }
 
-        template <FixedLengthString field>
+        template <typename Field>
+        requires(is_field<Field>)
         auto order_by(order_t ord = order_t::ASC) {
-            static_assert(not std::is_same_v<typename Select::from_t::column_by_name<field>::type, std::false_type>,
-                "ORDER BY clause must use a field beloning to the Table"
-            );
+            using column_t = Field::column_t;
+            using table_t = Field::table_t;
+
+            static_assert(table_is_selectable<table_t, SelectablesTuple>::value,
+                    "Field for `order_by` must belong to a table present in the query");
+
             std::stringstream ss;
-            ss << "ORDER BY `" << field.value << "` " << ord;
+            ss << "ORDER BY `" << table_t::name.value << "`.`" << column_t::name.value << "` " << ord;
             _order_clause = ss.str();
             return *this;
         }

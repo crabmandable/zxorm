@@ -631,7 +631,7 @@ TEST_F(QueryTest, OrderDesc)
     obj.some_text = std::string("h5");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->select_query<Object>().order_by<"id">(order_t::DESC).many();
+    auto result = my_conn->select_query<Object>().order_by<table_t::field_t<"id">>(order_t::DESC).many();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -662,7 +662,7 @@ TEST_F(QueryTest, OrderAscOne)
     obj.some_text = std::string("h5");
     ASSERT_FALSE(my_conn->insert_record(obj));
 
-    auto result = my_conn->select_query<Object>().order_by<"id">(order_t::ASC).one();
+    auto result = my_conn->select_query<Object>().order_by<table_t::field_t<"id">>(order_t::ASC).one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -686,7 +686,7 @@ TEST_F(QueryTest, OrderAscLimit)
     ASSERT_FALSE(my_conn->insert_record(obj));
 
     auto result = my_conn->select_query<Object>()
-        .order_by<"id">(order_t::DESC)
+        .order_by<table_t::field_t<"id">>(order_t::DESC)
         .limit(3)
         .many();
 
@@ -931,7 +931,7 @@ TEST_F(QueryTest, SelectAColumn)
     auto err = my_conn->insert_many_records(objs);
     ASSERT_FALSE(err);
 
-    auto result = my_conn->select_query<table_t::field_t<"id">>().order_by<"id">(order_t::DESC).one();
+    auto result = my_conn->select_query<table_t::field_t<"id">>().order_by<table_t::field_t<"id">>(order_t::DESC).one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());
@@ -949,7 +949,7 @@ TEST_F(QueryTest, SelectSeveralColumns)
 
     auto result = my_conn->select_query<
         Select<table_t::field_t<"id">, table_t::field_t<"text">>
-    >().order_by<"id">(order_t::DESC).one();
+    >().order_by<table_t::field_t<"id">>(order_t::DESC).one();
 
     if (result.is_error()) std::cout << result.error() << std::endl;
     ASSERT_FALSE(result.is_error());

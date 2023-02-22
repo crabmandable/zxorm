@@ -614,3 +614,35 @@ TEST_F(ForeignKeysTest, SelectAColumnWithJoins) {
 
     ASSERT_FALSE(rows[1].has_value());
 }
+
+TEST_F(ForeignKeysTest, OrderWithJoins) {
+    auto err = my_conn->insert_many_records(std::vector<Object1>{
+        { .text = "B" },
+        { .text = "A" },
+        { .text = "C" },
+    });
+    ASSERT_FALSE(err);
+
+    err = my_conn->insert_many_records(std::vector<Object2>{
+        { .obj1_id = 1 },
+        { .obj1_id = 2 },
+        { .obj1_id = 3 },
+    });
+    ASSERT_FALSE(err);
+
+    auto results = my_conn->select_query<Select<Object2>, Join<Object1>>()
+        .order_by<table1::field_t<"text">>()
+        .many();
+
+    if (results.is_error()) std::cout << results.error() << std::endl;
+    ASSERT_FALSE(results.is_error());
+
+    auto data = results.value().to_vector();
+    ASSERT_FALSE(data.is_error());
+    auto rows = std::move(data.value());
+    ASSERT_EQ(rows.size(), 3);
+
+    ASSERT_EQ(rows[0].obj1_id, 2);
+    ASSERT_EQ(rows[1].obj1_id, 1);
+    ASSERT_EQ(rows[2].obj1_id, 3);
+}
