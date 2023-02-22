@@ -410,27 +410,4 @@ namespace zxorm {
 
     template <typename T>
     static constexpr bool is_count = std::is_base_of_v<IsCountTrait, T>;
-
-    struct IsGroupByTrait {};
-
-    template <typename Field>
-    struct GroupBy : IsGroupByTrait {};
-
-    template <typename T>
-    static constexpr bool is_group_by = std::is_base_of_v<IsGroupByTrait, T>;
-
-    // table case
-    template <typename T>
-    struct __group_by_impl : __group_by_impl<Field<T, T::primary_key_t::name>> {};
-
-    // field case
-    template <typename Table, FixedLengthString name>
-    struct __group_by_impl<Field<Table, name>> {
-        using table_t = Table;
-        using field_t = Field<Table, name>;
-        friend std::ostream & operator<< (std::ostream &out, const __group_by_impl<field_t>&) {
-            out << "GROUP BY `" << field_t::table_t::name.value << "`.`" << field_t::name.value << "`";
-            return out;
-        }
-    };
 };

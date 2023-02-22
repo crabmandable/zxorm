@@ -50,9 +50,6 @@ namespace zxorm {
         template <typename JoinedTables, typename JoinedClauses, typename Last=void, typename... T>
         struct make_joins;
 
-        template<typename T>
-        struct make_group_by;
-
         template <typename selectables_tuple, typename T>
         struct selections_are_selectable;
 
@@ -425,12 +422,6 @@ namespace zxorm {
     > {};
 
     template <class... Table>
-    template <typename selectables_tuple, typename T>
-    struct Connection<Table...>::selections_are_selectable<selectables_tuple, GroupBy<T>> : std::bool_constant<
-        table_in_selectables<table_for_class_t<T>::name, selectables_tuple>::value
-    > {};
-
-    template <class... Table>
     template <typename selectables_tuple, typename... T>
     struct Connection<Table...>::selections_are_selectable<selectables_tuple, Select<T...>> : std::bool_constant<
         (... && (table_in_selectables<table_for_class_t<T>::name, selectables_tuple>::value))
@@ -441,65 +432,10 @@ namespace zxorm {
     template <typename T>
     struct unwrap_from<From<T>> : std::type_identity<T> {};
 
-    template <typename T, typename... Tails>
-    struct join_clauses : std::type_identity<T> {};
-
-    template <typename Next, typename... Tails>
-    struct join_clauses<std::tuple<>, Next, Tails...> : std::conditional_t<
-        is_join<Next>,
-        join_clauses<std::tuple<Next>, Tails...>,
-        join_clauses<std::tuple<>, Tails...>
-    > {};
-
-    template <typename... Heads, typename Next, typename... Tails>
-    struct join_clauses<std::tuple<Heads...>, Next, Tails...> : std::conditional_t<is_join<Next>,
-        join_clauses<std::tuple<Heads..., Next>, Tails...>,
-        join_clauses<std::tuple<Heads...>, Tails...>
-    > {};
-
-    template <typename T, typename... Tails>
-    struct group_by_clauses : std::type_identity<T> {};
-
-    template <typename Next, typename... Tails>
-    struct group_by_clauses<std::tuple<>, Next, Tails...> : std::conditional_t<is_group_by<Next>,
-        group_by_clauses<std::tuple<Next>, Tails...>,
-        group_by_clauses<std::tuple<>, Tails...>
-    > {};
-
-    template <typename... Heads, typename Next, typename... Tails>
-    struct group_by_clauses<std::tuple<Heads...>, Next, Tails...> : std::conditional_t<is_group_by<Next>,
-        group_by_clauses<std::tuple<Heads..., Next>, Tails...>,
-        group_by_clauses<std::tuple<Heads...>, Tails...>
-    > {};
-
-
     template<typename T>
     static constexpr bool select_starts_with_count_all = false;
     template<typename... U>
     static constexpr bool select_starts_with_count_all<Select<CountAll, U...>> = true;
-
-    template <class... Table>
-    template<typename T>
-    struct Connection<Table...>::make_group_by : std::type_identity<std::conditional_t<is_field<T>,
-        __group_by_impl<T>,
-        __group_by_impl<table_for_class_t<T>>
-    >>{};
-
-    // unwrap user facing template
-    template <class... Table>
-    template<typename T>
-    struct Connection<Table...>::make_group_by<GroupBy<T>> : std::type_identity<typename make_group_by<T>::type> {};
-
-    // unwrap tuple and use first element
-    template <class... Table>
-    template <typename Head, typename... Tails>
-    struct Connection<Table...>::make_group_by<std::tuple<Head, Tails...>> : std::type_identity<typename make_group_by<Head>::type> {};
-
-    // empty tuple case
-    template <class... Table>
-    template <typename T>
-    requires(std::is_same_v<std::tuple<>, T>)
-    struct Connection<Table...>::make_group_by<T> : std::type_identity<void> {};
 
     template <class... Table>
     template<typename SelectOrTable, typename From, typename... Clauses>
@@ -521,10 +457,8 @@ namespace zxorm {
 
         static constexpr bool select_clause_present = is_select_v<SelectOrTable>;
         static constexpr bool from_is_join = is_join<from_unwrapped>;
-        static constexpr bool from_is_group_by = is_group_by<from_unwrapped>;
 
         static constexpr bool from_clause_present = !from_is_join &&
-                                                    !from_is_group_by &&
                                                     !std::is_void_v<from_unwrapped>;
 
         static constexpr bool select_is_count_all = std::is_same_v<SelectOrTable, CountAll> || select_starts_with_count_all<SelectOrTable>;
@@ -545,23 +479,13 @@ namespace zxorm {
             typename select_or_table_table<SelectOrTable>::type
         >;
 
-        static_assert(all_of<(is_join<Clauses> || is_group_by<Clauses>)...>,
-                "select `Clauses` should be `Join` `JoinOn` or `GroupBy` templates");
+        static_assert(all_of<(is_join<Clauses>)...>,
+                "select `Clauses` should be `Join` or `JoinOn` templates");
 
         using joins_t = std::conditional_t<from_is_join,
-            typename join_clauses<std::tuple<>, from_unwrapped, Clauses...>::type,
-            typename join_clauses<std::tuple<>, Clauses...>::type
+            std::tuple<from_unwrapped, Clauses...>,
+            std::tuple<Clauses...>
         >;
-
-        using group_bys_tuple_t = std::conditional_t<from_is_group_by,
-            typename group_by_clauses<std::tuple<>, from_unwrapped, Clauses...>::type,
-            typename group_by_clauses<std::tuple<>, Clauses...>::type
-        >;
-        static_assert(std::tuple_size_v<group_bys_tuple_t> <= 1,
-                "Only a single `GroupBy` clause should be used in a query");
-        static constexpr bool group_by_present = std::tuple_size_v<group_bys_tuple_t> == 1;
-
-        using group_by_t = typename make_group_by<group_bys_tuple_t>::type;
 
         // if we have joins in the query, handle them here:
         if constexpr (std::tuple_size_v<joins_t>)
@@ -584,12 +508,6 @@ namespace zxorm {
             static_assert(selections_are_selectable<selectables_t, SelectOrTable>::value,
                     "One of the selected tables is not present in the query.");
 
-            // ensure group by is selectable
-            if constexpr (group_by_present) {
-                static_assert(selections_are_selectable<selectables_t, typename group_by_t::table_t>::value,
-                        "`GroupBy` clause targets a table not present in the query.");
-            }
-
             // if the query is nested and ANY of the joins produce optional records,
             // we make every column optional, figuring out specifically which columns are optional
             // is too complicated
@@ -597,7 +515,6 @@ namespace zxorm {
             return SelectQuery<
                 selectables_t,
                 typename select_type<results_are_optional, selectables_t, from_t, SelectOrTable>::type,
-                group_by_t,
                 joins_tuple>
             (
                 _db_handle.get(),
@@ -608,16 +525,10 @@ namespace zxorm {
         // queries without joins are handled here:
         else
         {
-            // ensure group by targets the `from` table
-            if constexpr (group_by_present) {
-                static_assert(std::is_same_v<from_t, typename group_by_t::table_t>,
-                        "`GroupBy` clause targets a table not present in the query.");
-            }
-
             // only the `from_t` is selectable since there are no joins
             using selectables_t = std::tuple<__joined_table<false, table_for_class_t<from_t>::name>>;
 
-            return SelectQuery<selectables_t, typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type, group_by_t> (
+            return SelectQuery<selectables_t, typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type> (
                 _db_handle.get(),
                 _logger
             );

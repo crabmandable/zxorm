@@ -8,7 +8,7 @@
 
 namespace zxorm {
 
-    template <typename Table, typename ColumnClause, typename GroupBy=void, typename JoinsTuple=std::tuple<>>
+    template <typename Table, typename ColumnClause, typename JoinsTuple=std::tuple<>>
     class Query {
     protected:
         const char* _table_name = Table::name.value;
@@ -31,10 +31,6 @@ namespace zxorm {
 
             if (_where) {
                 ss << _where->clause << " ";
-            }
-
-            if constexpr (not std::is_void_v<GroupBy>) {
-                ss << GroupBy{} << " ";
             }
 
             serialize_limits(ss);

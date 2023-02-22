@@ -93,7 +93,7 @@ int main (void) {
     connection.update_record(found.value());
 
     // find a record by some other column
-    auto zach = connection.select_query<Student>()
+    auto zach = connection.select_query<StudentTable>()
         .where(StudentTable::field_t<"name">().like("zach"))
         .one();
 
@@ -118,7 +118,7 @@ int main (void) {
     constexpr auto PASS_GPA = 3.0f;
 
     // find many records with a more complicated WHERE clause
-    auto students = connection.select_query<Student>()
+    auto students = connection.select_query<StudentTable>()
         .where(StudentTable::field_t<"gpa">() >= PASS_GPA &&
                StudentTable::field_t<"year">() >= Year::Sophmore)
         .many();
@@ -132,7 +132,7 @@ int main (void) {
     }
 
     // simple count query
-    auto n_failing = connection.select_query<CountAll, From<Student>>()
+    auto n_failing = connection.select_query<CountAll, From<StudentTable>>()
         .where(StudentTable::field_t<"gpa">() < PASS_GPA)
         .one();
 
@@ -141,9 +141,8 @@ int main (void) {
 
     // more complicated counting using a GroupBy clause
     auto count_result = connection.select_query<
-        Select<Count<Student>, StudentTable::field_t<"year">>,
-        GroupBy<StudentTable::field_t<"year">>
-    >().many();
+        Select<Count<Student>, StudentTable::field_t<"year">>
+    >().group_by<StudentTable::field_t<"year">>().many();
 
     for (const auto& row : count_result.value()) {
         // each row will be represented by a tuple, according to the `Select` clause

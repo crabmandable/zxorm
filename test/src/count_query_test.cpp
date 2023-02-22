@@ -181,9 +181,8 @@ TEST_F(CountQueryTest, CountWithGroupBy) {
 
     auto results = my_conn->select_query<
         Select<CountAll, table1::field_t<"text">>,
-        From<table1>,
-        GroupBy<table1::field_t<"text">>
-    >().order_by<table1::field_t<"text">>(order_t::DESC).many();
+        From<table1>
+    >().group_by<table1::field_t<"text">>().order_by<table1::field_t<"text">>(order_t::DESC).many();
 
     if (results.is_error()) std::cout << results.error() << std::endl;
     ASSERT_FALSE(results.is_error());
@@ -248,9 +247,8 @@ TEST_F(CountQueryTest, CountWithJoin) {
     auto results = my_conn->select_query<
         Select<Count<Object2>, table1::field_t<"text">>,
         From<Object1>,
-        Join<Object2>,
-        GroupBy<Object1>
-    >().many();
+        Join<Object2>
+    >().group_by<table1>().many();
 
     if (results.is_error()) std::cout << results.error() << std::endl;
     ASSERT_FALSE(results.is_error());
