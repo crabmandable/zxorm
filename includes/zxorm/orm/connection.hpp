@@ -526,7 +526,7 @@ namespace zxorm {
         else
         {
             // only the `from_t` is selectable since there are no joins
-            using selectables_t = std::tuple<__joined_table<false, table_for_class_t<from_t>::name>>;
+            using selectables_t = std::tuple<__selectable_table<false, table_for_class_t<from_t>::name>>;
 
             return SelectQuery<selectables_t, typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type> (
                 _db_handle.get(),

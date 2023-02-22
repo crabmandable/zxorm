@@ -9,8 +9,6 @@ Note to self: start from top
 
 * Experiment with exceptions
 
-* Enforce type safety for where expressions
-
 * Statement caching
 
 * REGEXP

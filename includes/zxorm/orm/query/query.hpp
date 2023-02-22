@@ -8,7 +8,7 @@
 
 namespace zxorm {
 
-    template <typename Table, typename ColumnClause, typename JoinsTuple=std::tuple<>>
+    template <typename SelectablesTuple, typename Table, typename ColumnClause, typename JoinsTuple=std::tuple<>>
     class Query {
     protected:
         const char* _table_name = Table::name.value;
@@ -51,6 +51,10 @@ namespace zxorm {
 
         template <typename Expression>
         auto where(const Expression& e) {
+
+            static_assert(tables_are_selectable<typename Expression::tables_t, SelectablesTuple>::value,
+                    "Some fields in `Where` expression are not present in the query");
+
             _where = std::make_shared<Where<decltype(e.bindings())>>(e);
             return *this;
         }

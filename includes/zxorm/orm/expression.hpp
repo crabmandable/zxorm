@@ -78,6 +78,12 @@ namespace zxorm {
 
     template <boolean_op_t op, typename LHS, typename RHS>
     struct ExpressionExpression {
+
+        using tables_t = decltype(std::tuple_cat(
+            std::declval<typename std::remove_cvref_t<LHS>::tables_t>(),
+            std::declval<typename std::remove_cvref_t<RHS>::tables_t>()
+        ));
+
         LHS lhs;
         RHS rhs;
         ExpressionExpression(LHS lhs, RHS rhs) : lhs{lhs}, rhs{rhs} {}
@@ -110,6 +116,7 @@ namespace zxorm {
 
     template <typename Table, typename Column, comparison_op_t op, typename RHS>
     struct ColumnExpression {
+        using tables_t = std::tuple<Table>;
         RHS to_bind;
         ColumnExpression(RHS rhs) : to_bind{rhs} {}
 

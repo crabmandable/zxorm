@@ -237,6 +237,23 @@ namespace zxorm {
         static const std::size_t value = 1 + tuple_index<T, std::tuple<Types...>>::value;
     };
 
+    template <typename T, typename SelectablesTuple>
+    struct table_is_selectable {};
+
+    template <typename T, typename... Selectable>
+    struct table_is_selectable<T, std::tuple<Selectable...>> : std::bool_constant <
+       (... || (T::name == Selectable::table_name))
+    > {};
+
+    template <typename T, typename SelectablesTuple>
+    struct tables_are_selectable : std::false_type {};
+
+    template <typename... T, typename SelectablesTuple>
+    struct tables_are_selectable<std::tuple<T...>, SelectablesTuple> : std::bool_constant <
+        (... && table_is_selectable<T, SelectablesTuple>::value)
+    > {};
+
+
     template<typename T>
     void dump_type () {
         printf("%s\n", __PRETTY_FUNCTION__);

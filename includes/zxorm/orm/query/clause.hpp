@@ -253,7 +253,7 @@ namespace zxorm {
     };
 
     template<bool _is_optional, FixedLengthString _table_name>
-    struct __joined_table {
+    struct __selectable_table {
         static constexpr auto is_optional = _is_optional;
         static constexpr auto table_name = _table_name;
     };
@@ -322,8 +322,8 @@ namespace zxorm {
         static constexpr auto left_table_name = other_table_t::name;
 
         using selectables_tuple = std::tuple<
-            __joined_table<left_is_optional(type), left_table_name>,
-            __joined_table<right_is_optional(type), right_table_name>
+            __selectable_table<left_is_optional(type), left_table_name>,
+            __selectable_table<right_is_optional(type), right_table_name>
         >;
 
         friend std::ostream & operator<< (std::ostream &out, const __join_impl<TableToJoin, type, AlreadyJoinedTuple>&) {
@@ -370,8 +370,8 @@ namespace zxorm {
         static constexpr auto right_field_name = left_is_b ? FieldA::name.value : FieldB::name.value;
 
         using selectables_tuple = std::tuple<
-            __joined_table<left_is_optional(type), left_table_name>,
-            __joined_table<right_is_optional(type), right_table_name>
+            __selectable_table<left_is_optional(type), left_table_name>,
+            __selectable_table<right_is_optional(type), right_table_name>
         >;
 
         friend std::ostream & operator<< (std::ostream &out, const __join_on_impl<FieldA, FieldB, type, AlreadyJoinedTuple>&) {

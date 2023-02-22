@@ -8,9 +8,9 @@
 
 namespace zxorm {
     template <typename SelectablesTuple, typename Select, typename JoinsTuple=std::tuple<>>
-    class SelectQuery : public Query<typename Select::from_t, Select, JoinsTuple> {
+    class SelectQuery : public Query<SelectablesTuple, typename Select::from_t, Select, JoinsTuple> {
     private:
-        using Super = Query<typename Select::from_t, Select, JoinsTuple>;
+        using Super = Query<SelectablesTuple, typename Select::from_t, Select, JoinsTuple>;
 
         std::string _limit_clause;
         std::string _order_clause;
@@ -19,14 +19,6 @@ namespace zxorm {
         virtual void serialize_limits(std::ostream& ss) override {
             ss << _group_by_clause << " " << _order_clause << " " << _limit_clause;
         }
-
-        template <typename T, typename U>
-        struct table_is_selectable {};
-
-        template <typename T, typename... U>
-        struct table_is_selectable<T, std::tuple<U...>> : std::bool_constant <
-           (... || (T::name == U::table_name))
-        > {};
 
         template <typename T, size_t s>
         struct ColumnOffset{

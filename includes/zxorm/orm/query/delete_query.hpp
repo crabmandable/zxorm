@@ -14,8 +14,15 @@ namespace zxorm {
         };
     };
     template <class From>
-    class DeleteQuery : public Query<From, __delete_detail::DeleteColumnClause> {
-    using Super = Query<From, __delete_detail::DeleteColumnClause>;
+    class DeleteQuery : public Query<
+                        std::tuple<__selectable_table<false, From::name>>,
+                        From,
+                        __delete_detail::DeleteColumnClause>
+    {
+        using Super = Query<
+            std::tuple<__selectable_table<false, From::name>>,
+            From,
+            __delete_detail::DeleteColumnClause>;
 
     public:
         DeleteQuery(sqlite3* handle, Logger logger) :
