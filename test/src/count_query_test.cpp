@@ -270,3 +270,22 @@ TEST_F(CountQueryTest, CountWithJoin) {
     text = std::get<1>(row2);
     ASSERT_EQ(text, "goodbye");
 }
+
+TEST_F(CountQueryTest, CountWithWhere) {
+    Object1 obj = { .text = "hello" };
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    obj = { .text = "goodbye" };
+    err = my_conn->insert_record(obj);
+    obj.id = 0;
+    err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    auto result = my_conn->select_query<CountAll, From<Object1>>()
+        .where(table1::field_t<"text">().like("goodbye"))
+        .one();
+
+    ASSERT_FALSE(result.is_error());
+    ASSERT_EQ(2, result.value());
+}

@@ -1,8 +1,5 @@
 Note to self: start from top
 
-* More count tests:
-    count with where
-
 * Docs
 
 * Reorganize code - need to split `clause` up, and try to clean up `connection`
