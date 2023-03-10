@@ -1,4 +1,4 @@
-# ZXORM
+# ZxORM
 **Z**ach's **O**bject **R**elational **M**apping library - A C++20 ORM for SQLite
 ___
 
@@ -77,5 +77,5 @@ Much influence was taken from the excellent [`sqlpp11`](https://github.com/rbock
 library, however it is not a true ORM, and requires code generation, or manually
 writing a lot of boilerplate.
 
-I wanted to write something that is simple to integrate, and easy to start using,
-that is totally agnostic to how the `Object` in the `ORM` is written.
+I wanted to write something that is simple to integrate, easy to start using, and
+totally agnostic to how the `Object` in the `ORM` is written.
