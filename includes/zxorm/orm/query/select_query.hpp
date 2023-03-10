@@ -153,79 +153,81 @@ namespace zxorm {
         SelectQuery(sqlite3* handle, Logger logger) :
             Super(handle, logger) {}
 
-        auto where(auto&&... args) {
+        auto& where(auto&&... args) {
             Super::where(std::forward<decltype(args)>(args)...);
             return *this;
         }
 
-        auto limit(unsigned long limit) {
-            std::stringstream ss;
-            ss << "LIMIT " << limit;
-            _limit_clause = ss.str();
+        auto& limit(unsigned long limit) {
+            if (_limit_clause.empty()) {
+                std::stringstream ss;
+                ss << "LIMIT " << limit;
+                _limit_clause = ss.str();
+            }
             return *this;
         }
 
         template <typename Field>
         requires(is_field<Field>)
-        auto order_by(order_t ord = order_t::ASC) {
-            using column_t = Field::column_t;
-            using table_t = Field::table_t;
+        auto& order_by(order_t ord = order_t::ASC) {
+            if (_order_clause.empty()) {
+                using column_t = Field::column_t;
+                using table_t = Field::table_t;
 
-            static_assert(table_is_selectable<table_t, SelectablesTuple>::value,
-                    "Field for `order_by` must belong to a table present in the query");
+                static_assert(table_is_selectable<table_t, SelectablesTuple>::value,
+                        "Field for `order_by` must belong to a table present in the query");
 
-            std::stringstream ss;
-            ss << "ORDER BY `" << table_t::name.value << "`.`" << column_t::name.value << "` " << ord;
-            _order_clause = ss.str();
+                std::stringstream ss;
+                ss << "ORDER BY `" << table_t::name.value << "`.`" << column_t::name.value << "` " << ord;
+                _order_clause = ss.str();
+            }
             return *this;
         }
 
         template <typename T>
-        auto group_by() {
-            const char* column_name;
-            const char* table_name;
+        auto& group_by() {
+            if (_group_by_clause.empty()) {
+                const char* column_name;
+                const char* table_name;
 
-            static_assert(is_field<T> || is_table_v<T>,
-                    "Argument for `group_by` should be a Field or a Table");
+                static_assert(is_field<T> || is_table_v<T>,
+                        "Argument for `group_by` should be a Field or a Table");
 
-            if constexpr (is_field<T>) {
-                column_name = T::column_t::name.value;
-                table_name = T::table_t::name.value;
-                static_assert(table_is_selectable<typename T::table_t, SelectablesTuple>::value,
-                        "Field for `group_by` must belong to a table present in the query");
-            } else {
-                column_name = T::primary_key_t::name.value;
-                table_name = T::name.value;
-                static_assert(table_is_selectable<T, SelectablesTuple>::value,
-                        "Table for `group_by` must be a table present in the query");
+                if constexpr (is_field<T>) {
+                    column_name = T::column_t::name.value;
+                    table_name = T::table_t::name.value;
+                    static_assert(table_is_selectable<typename T::table_t, SelectablesTuple>::value,
+                            "Field for `group_by` must belong to a table present in the query");
+                } else {
+                    column_name = T::primary_key_t::name.value;
+                    table_name = T::name.value;
+                    static_assert(table_is_selectable<T, SelectablesTuple>::value,
+                            "Table for `group_by` must be a table present in the query");
+                }
+
+
+                std::stringstream ss;
+                ss << "GROUP BY `" << table_name << "`.`" << column_name << "`";
+                _group_by_clause = ss.str();
             }
-
-
-            std::stringstream ss;
-            ss << "GROUP BY `" << table_name << "`.`" << column_name << "`";
-            _group_by_clause = ss.str();
             return *this;
         }
 
         auto one() -> OptionalResult<return_t>
         {
-            assert(_limit_clause.empty());
             limit(1);
-            ZXORM_GET_RESULT(Statement s, Super::prepare());
-            ZXORM_TRY(s.step());
-            if (s.done()) {
+            ZXORM_TRY(Super::prepare());
+            ZXORM_TRY(Super::_stmt->step());
+            if (Super::_stmt->done()) {
                 return std::nullopt;
             }
 
-            return read_row(s);
+            return read_row(*Super::_stmt);
         }
 
         Result<RecordIterator<return_t>> many() {
-            auto s = Super::prepare();
-            if (s.is_error()) {
-                return s.error();
-            }
-            return RecordIterator<return_t>(std::move(s.value()), read_row);
+            ZXORM_TRY(Super::prepare());
+            return RecordIterator<return_t>(Super::_stmt, read_row);
         }
     };
 };

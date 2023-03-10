@@ -1,5 +1,6 @@
 #pragma once
 #include <iterator>
+#include <memory>
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/result.hpp"
 
@@ -10,10 +11,10 @@ namespace zxorm {
     private:
         using result_t = Result<return_t>;
         using row_reader_t = std::function<result_t(Statement&)>;
-        Statement _stmt;
+        std::shared_ptr<Statement> _stmt;
         row_reader_t _row_reader;
     public:
-        RecordIterator(Statement&& stmt,  row_reader_t row_reader) :
+        RecordIterator(std::shared_ptr<Statement> stmt,  row_reader_t row_reader) :
             _stmt{std::move(stmt)}, _row_reader{row_reader} { }
 
         class iterator
@@ -25,7 +26,7 @@ namespace zxorm {
         public:
             using iterator_category = std::input_iterator_tag;
 
-            iterator(Statement& stmt, row_reader_t row_reader): _stmt{&stmt}, _row_reader{row_reader} {
+            iterator(Statement* stmt, row_reader_t row_reader): _stmt{stmt}, _row_reader{row_reader} {
                 ++(*this);
             }
             iterator() = default;
@@ -58,7 +59,7 @@ namespace zxorm {
         };
 
         iterator begin() {
-            auto err = _stmt.rewind();
+            auto err = _stmt->rewind();
             if (err) {
 #if __cpp_exceptions
                 throw std::runtime_error(std::string("Unable to rewind statement: ") + std::string(err.value()));
@@ -67,7 +68,7 @@ namespace zxorm {
                 return iterator();
             }
 
-            return iterator(_stmt, _row_reader);
+            return iterator(_stmt.get(), _row_reader);
         }
         iterator end() {
             return iterator();

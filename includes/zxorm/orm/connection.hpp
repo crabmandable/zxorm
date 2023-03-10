@@ -15,6 +15,7 @@
 #include <memory>
 #include <optional>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 
 namespace zxorm {
@@ -27,6 +28,27 @@ namespace zxorm {
 
         db_handle_ptr _db_handle;
         Logger _logger = nullptr;
+
+        // more complicated queries are omitted, since this is only relevant for things that can be cached
+        // i.e. queries that always have the same number of binds
+        enum class QueryCacheType {
+            find_record,
+            delete_record,
+            first,
+            last,
+        };
+
+        std::unordered_map<
+            std::string_view, // table name
+            std::unordered_map<
+                QueryCacheType,
+                std::shared_ptr<BaseQuery>
+            >
+        > _query_cache;
+
+        // theset don't use the query template
+        std::unordered_map<std::string_view /* table name */, std::shared_ptr<Statement>> _insert_statement_cache;
+        std::unordered_map<std::string_view /* table name */, std::shared_ptr<Statement>> _update_statement_cache;
 
         Connection(sqlite3* db_handle, Logger logger);
 
@@ -606,8 +628,14 @@ namespace zxorm {
             }
         }
 
-        auto query = table_t::update_query();
-        ZXORM_GET_RESULT(Statement update_stmt, make_statement(query));
+        auto& stmt = _update_statement_cache[table_t::name.value];
+        if (!stmt) {
+            auto query = table_t::update_query();
+            ZXORM_GET_RESULT(Statement update_stmt, make_statement(query));
+            stmt = std::make_shared<Statement>(std::move(update_stmt));
+        } else {
+            ZXORM_TRY(stmt->reset());
+        }
 
         int i = 1;
         OptionalError err;
@@ -616,7 +644,7 @@ namespace zxorm {
                 if (err) return;
                 if constexpr (not U::is_primary_key) {
                     auto& val = U::getter(record);
-                    err = update_stmt.bind(i++, val);
+                    err = stmt->bind(i++, val);
                 }
 
             }(), ...);
@@ -626,10 +654,10 @@ namespace zxorm {
             return err;
         }
 
-        ZXORM_TRY(update_stmt.bind(i++, pk));
-        ZXORM_TRY(update_stmt.step());
+        ZXORM_TRY(stmt->bind(i++, pk));
+        ZXORM_TRY(stmt->step());
 
-        if (!update_stmt.done()) {
+        if (!stmt->done()) {
             return Error("Update query didn't run to completion");
         }
 
@@ -708,8 +736,16 @@ namespace zxorm {
     {
         using table_t = table_for_class_t<T>;
 
-        auto query = table_t::insert_query();
-        ZXORM_GET_RESULT(Statement insert_stmt, make_statement(query));
+        auto& stmt = _insert_statement_cache[table_t::name.value];
+
+        if (!stmt) {
+            auto query = table_t::insert_query();
+            ZXORM_GET_RESULT(Statement insert_stmt, make_statement(query));
+            stmt = std::make_shared<Statement>(std::move(insert_stmt));
+        } else {
+            ZXORM_TRY(stmt->reset());
+        }
+
 
         int i = 1;
         OptionalError err;
@@ -719,7 +755,7 @@ namespace zxorm {
 
                 if constexpr (!U::is_auto_inc_column) {
                     auto& val = U::getter(record);
-                    err = insert_stmt.bind(i++, val);
+                    err = stmt->bind(i++, val);
                 }
 
             }(), ...);
@@ -729,9 +765,9 @@ namespace zxorm {
             return err;
         }
 
-        ZXORM_TRY(insert_stmt.step());
+        ZXORM_TRY(stmt->step());
 
-        if (!insert_stmt.done()) {
+        if (!stmt->done()) {
             return Error("Insert query didn't run to completion");
         }
 
@@ -781,7 +817,7 @@ namespace zxorm {
     OptionalResult<T> Connection<Table...>::find_record(const PrimaryKeyType& id)
     {
         using table_t = table_for_class_t<T>;
-
+        using query_t = decltype(make_select_query<T>());
         static_assert(table_t::has_primary_key, "Cannot execute a find on a table without a primary key");
 
         using primary_key_t = typename table_t::primary_key_t;
@@ -789,8 +825,15 @@ namespace zxorm {
         static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
+        const char* table_name = table_t::name.value;
+        auto& cache_item = _query_cache[table_name][QueryCacheType::find_record];
+
+        if (!cache_item) {
+            cache_item = std::make_shared<query_t>(std::move(make_select_query<T>()));
+        }
+
         auto e = Field<table_t, primary_key_t::name>() == id;
-        return make_select_query<T>().where(e).one();
+        return std::static_pointer_cast<query_t>(cache_item)->where(e).one();
     }
 
     template <class... Table>
@@ -798,6 +841,7 @@ namespace zxorm {
     OptionalError Connection<Table...>::delete_record(const PrimaryKeyType& id)
     {
         using table_t = table_for_class_t<T>;
+        using query_t = decltype(make_delete_query<T>());
 
         static_assert(table_t::has_primary_key, "Cannot execute a delete on a table without a primary key");
 
@@ -806,7 +850,15 @@ namespace zxorm {
         static_assert(std::is_convertible_v<PrimaryKeyType, typename primary_key_t::member_t>,
                 "Primary key type does not match the type specified in the definition of the table");
 
-        return make_delete_query<T>().where(Field<table_t, primary_key_t::name>() == id).exec();
+        const char* table_name = table_t::name.value;
+        auto& cache_item = _query_cache[table_name][QueryCacheType::delete_record];
+
+        if (!cache_item) {
+            cache_item = std::make_shared<query_t>(std::move(make_delete_query<T>()));
+        }
+
+        auto e = Field<table_t, primary_key_t::name>() == id;
+        return std::static_pointer_cast<query_t>(cache_item)->where(e).exec();
     }
 
     template <class... Table>
@@ -827,7 +879,16 @@ namespace zxorm {
     template<class T>
     auto Connection<Table...>::first()
     {
-        return make_select_query<T>().one();
+        using table_t = table_for_class_t<T>;
+        using query_t = decltype(make_select_query<T>());
+
+        auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::first];
+
+        if (!cache_item) {
+            cache_item = std::make_shared<query_t>(std::move(make_select_query<T>()));
+        }
+
+        return std::static_pointer_cast<query_t>(cache_item)->one();
     }
 
     template <class... Table>
@@ -835,8 +896,17 @@ namespace zxorm {
     auto Connection<Table...>::last()
     {
         using table_t = table_for_class_t<T>;
+        using query_t = decltype(make_select_query<T>());
         using pk_field = Field<table_t, table_t::primary_key_t::name>;
-        return make_select_query<T>().template order_by<pk_field>(order_t::DESC).one();
+
+        auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::last];
+
+        if (!cache_item) {
+            cache_item = std::make_shared<query_t>(std::move(make_select_query<T>()));
+            std::static_pointer_cast<query_t>(cache_item)->template order_by<pk_field>(order_t::DESC);
+        }
+
+        return std::static_pointer_cast<query_t>(cache_item)->one();
     }
 
     template <class... Table>

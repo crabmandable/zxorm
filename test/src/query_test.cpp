@@ -129,6 +129,37 @@ TEST_F(QueryTest, FindSomething)
     }
 }
 
+TEST_F(QueryTest, FindManyTimes)
+{
+    std::vector<std::string> text = {
+        "hello",
+        "there",
+        "this",
+        "is",
+        "text",
+    };
+
+    for (size_t i = 0; i < text.size(); i++) {
+        Object obj;
+        obj.some_text = text[i];
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    for (int id = 1; id <= 5; id++) {
+        auto result = my_conn->find_record<Object>(id);
+        if (result.is_error()) {
+            auto err = result.error();
+            std::cout << std::string(err) << std::endl;
+        }
+        ASSERT_FALSE(result.is_error());
+        std::optional<Object> record = std::move(result);
+        ASSERT_TRUE(record);
+        ASSERT_EQ(record.value().id, id);
+        ASSERT_EQ(record.value().some_text, text[id - 1]);
+    }
+}
+
 TEST_F(QueryTest, FindSomethingWithOptionalsFilled)
 {
     Object obj;
