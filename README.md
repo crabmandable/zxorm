@@ -79,3 +79,27 @@ writing a lot of boilerplate.
 
 I wanted to write something that is simple to integrate, easy to start using, and
 totally agnostic to how the `Object` in the `ORM` is written.
+
+___
+### Caching queries
+
+The basic queries such as `find_record`, `insert_record` and `delete_record` will
+use statement caching, meaning that the query string does not need to be regenerated,
+and the statement doesn't need to be recompiled by the underlying SQL engine.
+
+This is possible since the shape of these queries, and the number of binds
+never changes. For more open ended queries, caching and reuse is possible,
+but it is up to **you** to implement.
+
+It is very important to note that when reusing queries, it is not possible to
+change the text of a query that was already executed, it can only be bound with
+different parameters. If a query is reused with a different where clause,
+then undefined behaviour may occur.
+___
+
+### Multithreading
+
+This is currently not well tested but in theory it should work fine as long as
+you follow the golden rule:
+
+**:warning: 1 connection per thread**
