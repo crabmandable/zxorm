@@ -81,6 +81,142 @@ I wanted to write something that is simple to integrate, easy to start using, an
 totally agnostic to how the `Object` in the `ORM` is written.
 
 ___
+### Select queries
+
+For more complicated queries, the connection class has the `select_query`.
+
+This function returns a query object that can be executed (using `many` or `one`)
+to obtain results.
+
+e.g.
+```cpp
+auto results = connection.select_query<Object>().many();
+// or
+auto result = connection.select_query<Object>().one();
+```
+
+#### Where
+
+A `where` clause can also be added like so:
+```cpp
+auto results = connection.select_query<Object>()
+    .where(ObjectTable::field_t<"some_text">().like("hello %"))
+    .many();
+```
+In order to reference specific fields on the table, the `Table` template must be
+used (here `ObjectTable` is the alias from the example at the top of the README).
+
+#### Limits
+
+Similarly, `order` and `limits` can be applied
+```cpp
+auto results = connection.select_query<Object>()
+    .order_by<ObjectTable::field_t<"some_text">>(zxorm::order_t::DESC)
+    .limit(10)
+    .many();
+```
+
+#### Selecting specific columns:
+
+The same field template can be used to select specific columns too:
+```cpp
+auto results = connection.select_query<ObjectTable::field_t<"some_text">>().many();
+```
+
+Multiple items can be selected using the `Select` template.
+The results will be returned as tuples
+
+```cpp
+zxorm::Result<std::tuple<int, Object>> result = connection.select_query<
+    Select<ObjectTable::field_t<"id">, Object>
+>().one();
+```
+
+#### Joins
+
+The template arguments for the `select_query` function use an SQL-like syntax
+and can include which columns or tables to return, as well as other tables that
+should be joined like so:
+```cpp
+auto results = connection.select_query<
+    Select<User, UserData>,
+    From<User>,
+    Join<UserData>
+>().many();
+
+// In case you are interested, the type of `results` is:
+// zxorm::Result<zxorm::RecordIterator<std::tuple<User, UserData>>>
+```
+If the `From` clause is omitted, then it will default to the first thing selected
+
+Of course, many joins can be used. The only limitation is on the order that the
+clauses are used. Each join should refer to a table that was already "joined"
+in a previous clause:
+```cpp
+auto results = connection.select_query<
+    Select<User, Group>,
+    From<User>,
+    Join<UserGroup>, // we can imagine this is a join table, joining users & groups
+    Join<Group>
+>().many();
+```
+
+The `Join` template will only work if `zxorm` knows about a foreign key that can
+be used to relate the two tables.
+
+If there is no foreign key, the `JoinOn` template can be used instead, which takes
+two `zxorm::Field`s instead e.g.
+
+```cpp
+auto results = connection.select_query<
+    Select<User, Group>,
+    From<User>,
+    JoinOn<UserGroupTable::field_t<"user_id">, UserTable::field_t<"id">>,
+    JoinOn<GroupTable::field_t<"id">, UserGroupTable::field_t<"group_id">>
+>().many();
+```
+_The order of the two fields doesn't matter_
+
+
+#### Counting & Grouping
+
+The `Count` template can be used instead of a table or column to select a count
+```cpp
+// you can specify the column to count:
+auto result = my_conn->select_query<Count<ObjectTable::field_t<"id">>().one();
+
+// if unspecified, the primary key will be used
+auto result = my_conn->select_query<Count<ObjectTable>>().one();
+```
+
+`CountAll` can be used to select `COUNT(*)` also
+```cpp
+auto result = my_conn->select_query<CountAll, From<Object>>().one();
+```
+
+And of course the results can be grouped too, allowing occurrences to be counted:
+```cpp
+auto results = my_conn->select_query<
+    Select<CountAll, ObjectTable::field_t<"some_text">>,
+    From<Object>
+>().group_by<ObjectTable::field_t<"some_text">>();
+```
+___
+### Delete queries
+
+The connection has a `delete_query` function that can be used to construct and
+execute deletions. It behaves similarly to the `select_query` interface, although
+it is much simpler.
+
+```cpp
+auto err = my_conn->delete_query<Object>()
+    .where(ObjectTable::field_t<"some_text">().like("hello %")
+    .exec();
+```
+
+Using joins in a delete query is not supported, since it is not part of the SQL
+standard, and not supported by SQLite.
+___
 ### Caching queries
 
 The basic queries such as `find_record`, `insert_record` and `delete_record` will
