@@ -1022,3 +1022,34 @@ TEST_F(QueryTest, SelectSeveralColumns)
     std::string text = std::get<1>(result.value());
     ASSERT_EQ(text, "yes");
 }
+
+TEST_F(QueryTest, ReuseAQuery)
+{
+    Object obj;
+    obj.some_text = "yes";
+    auto err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    auto query = my_conn->select_query<table_t::field_t<"text">>();
+    query.order_by<table_t::field_t<"id">>(order_t::DESC);
+
+    auto result = query.one();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    std::string text = result.value();
+    ASSERT_EQ(text, "yes");
+
+    obj.id = 0;
+    obj.some_text = "nope";
+    err = my_conn->insert_record(obj);
+    ASSERT_FALSE(err);
+
+    result = query.one();
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    text = result.value();
+    ASSERT_EQ(text, "nope");
+}

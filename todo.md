@@ -1,10 +1,9 @@
 Note to self: start from top
 
-* offset! (cant page)
-
-* Reuse a select query + show in readme how to do it
+* Split preparation & execution into two steps so that reuse makes more sense
 
 * Docs
+    * Reuse of query in readme
 
 * Transaction tests
 
