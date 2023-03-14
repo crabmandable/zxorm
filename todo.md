@@ -1,6 +1,12 @@
 Note to self: start from top
 
+* offset! (cant page)
+
+* Reuse a select query + show in readme how to do it
+
 * Docs
+
+* Transaction tests
 
 * Reorganize code - need to split `clause` up, and try to clean up `connection`
 

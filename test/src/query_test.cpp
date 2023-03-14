@@ -733,6 +733,36 @@ TEST_F(QueryTest, OrderAscLimit)
     ASSERT_EQ(vec.value()[2].id, 4);
 }
 
+TEST_F(QueryTest, LimitWithOffset)
+{
+    Object obj;
+    for (size_t i = 0; i < 4; i++) {
+        obj.some_text = std::string("hello") + std::to_string(i);
+        auto err = my_conn->insert_record(obj);
+        ASSERT_FALSE(err);
+    }
+
+    obj.some_text = std::string("helllo4");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+    obj.some_text = std::string("h5");
+    ASSERT_FALSE(my_conn->insert_record(obj));
+
+    auto result = my_conn->select_query<Object>()
+        .limit(3, 3)
+        .many();
+
+    if (result.is_error()) std::cout << result.error() << std::endl;
+    ASSERT_FALSE(result.is_error());
+
+    auto iter = result.value();
+    auto vec = iter.to_vector();
+    ASSERT_FALSE(vec.is_error());
+    ASSERT_EQ(vec.value().size(), 3);
+    ASSERT_EQ(vec.value()[0].id, 4);
+    ASSERT_EQ(vec.value()[1].id, 5);
+    ASSERT_EQ(vec.value()[2].id, 6);
+}
+
 TEST_F(QueryTest, EmptyOne)
 {
     Object obj;

@@ -158,10 +158,13 @@ namespace zxorm {
             return *this;
         }
 
-        auto& limit(unsigned long limit) {
+        auto& limit(unsigned long limit, unsigned long offset = 0) {
             if (_limit_clause.empty()) {
                 std::stringstream ss;
                 ss << "LIMIT " << limit;
+                if (offset) {
+                    ss << " OFFSET " << offset;
+                }
                 _limit_clause = ss.str();
             }
             return *this;
