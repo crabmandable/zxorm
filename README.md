@@ -39,6 +39,8 @@ auto result = zxorm::Connection<ObjectTable>::create("data.db");
 assert(!result.is_error());
 auto connection = std::move(result.value());
 ```
+The connection template accepts a list of tables, and should contain all the tables
+that your application is going to work with.
 
 4. Start running queries
 ```cpp
