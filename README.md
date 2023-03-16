@@ -10,7 +10,7 @@ ___
 * SQL like syntax for writing more complicated queries without writing raw SQL
 
 
-### Getting started
+## Getting started
 1. Write your objects
 
 ```cpp
@@ -58,31 +58,25 @@ assert(result.value().some_text == "!");
 
 Check out the [example](./example.cpp) for more
 ___
-
-### Why did I write this?
-
-I created this library after looking at what was available in C++ and seeing that
-the options for a true ORM library are quite limited.
-
-Many C++ programmers will tell you that an ORM is simply bloat that will slow
-your performance, and they're not entirely wrong. However, there is a reason
-why they proliferate in higher level languages: they are incredibly valuable
-for the maintainability of large projects. `zxorm` is an attempt to have our cake
-and eat it.
-
-Almost all C++ ORMs are built using traditional object oriented paradigms, without
-making much use of modern C++ metaprogramming techniques. C++20 introduced many
-useful metaprogramming features into the language, which `zxorm` utilizes to
-generate queries with compile-time type checking.
-
-Much influence was taken from the excellent [`sqlpp11`](https://github.com/rbock/sqlpp11)
-library, however it is not a true ORM, and requires code generation, or manually
-writing a lot of boilerplate.
-
-I wanted to write something that is simple to integrate, easy to start using, and
-totally agnostic to how the `Object` in the `ORM` is written.
+## Building
+The library is header only, so all you need to do is include the `includes` directory,
+and link sqlite
+```sh
+g++ example.cpp -Izxorm/includes -o example.bin `pkg-config --libs sqlite3` -std=c++20
+```
 
 ___
+There is also a `CMakeLists.txt` that can be used for integrating easily into a
+CMake project. Simply include this repository as a subdirectory:
+```cmake
+add_subdirectory("./zxorm")
+```
+
+Unfortunately I only `gcc` is supported.
+I don't have a Windows machine, and I haven't had time to make it work with clang.
+___
+## Usage
+
 ### Select queries
 
 For more complicated queries, the connection class has the `select_query`.
@@ -241,3 +235,29 @@ This is currently not well tested but in theory it should work fine as long as
 you follow the golden rule:
 
 **:warning: 1 connection per thread**
+
+___
+## Why did I write this?
+
+I created this library after looking at what was available in C++ and seeing that
+the options for a true ORM library are quite limited.
+
+Many C++ programmers will tell you that an ORM is simply bloat that will slow
+your performance, and they're not entirely wrong. However, there is a reason
+why they proliferate in higher level languages: they are incredibly valuable
+for the maintainability of large projects. `zxorm` is an attempt to have our cake
+and eat it.
+
+Almost all C++ ORMs are built using traditional object oriented paradigms, without
+making much use of modern C++ metaprogramming techniques. C++20 introduced many
+useful metaprogramming features into the language, which `zxorm` utilizes to
+generate queries with compile-time type checking.
+
+Much influence was taken from the excellent [`sqlpp11`](https://github.com/rbock/sqlpp11)
+library, however it is not a true ORM, and requires code generation, or manually
+writing a lot of boilerplate.
+
+I wanted to write something that is simple to integrate, easy to start using, and
+totally agnostic to how the `Object` in the `ORM` is written.
+
+___
