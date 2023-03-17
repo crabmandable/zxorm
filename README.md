@@ -72,8 +72,9 @@ CMake project. Simply include this repository as a subdirectory:
 add_subdirectory("./zxorm")
 ```
 
-Unfortunately I only `gcc` is supported.
-I don't have a Windows machine, and I haven't had time to make it work with clang.
+Currently only `gcc` 12 and `clang` 15 are tested and working on linux
+
+I don't have a Windows machine, and won't be adding support any time soon.
 ___
 ## Usage
 

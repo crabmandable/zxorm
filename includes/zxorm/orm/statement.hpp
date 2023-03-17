@@ -84,7 +84,7 @@ namespace zxorm {
             assert(idx != 0);
             using unwrapped_t = typename remove_optional<T>::type;
             const unwrapped_t* unwrapped;
-            int result;
+            int result = SQLITE_OK;
             bool bound_null = false;
             if constexpr (ignore_qualifiers::is_optional<T>()) {
                 if (!param.has_value()) {
@@ -121,7 +121,7 @@ namespace zxorm {
         {
             assert(idx != 0);
             bool bound_null = false;
-            int result;
+            int result = SQLITE_OK;
 
             if constexpr (ignore_qualifiers::is_optional<T>()) {
                 if (!param.has_value()) {

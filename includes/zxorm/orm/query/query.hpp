@@ -70,6 +70,8 @@ namespace zxorm {
 
     public:
         Query(sqlite3* handle, Logger logger) : _handle(handle), _logger(logger) { }
+        Query(Query&&other) = default;
+        virtual ~Query() = default;
 
         template <typename Expression>
         void where(const Expression& e) {

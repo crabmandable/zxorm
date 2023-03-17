@@ -32,7 +32,7 @@ namespace zxorm {
         private:
             static constexpr std::array<size_t, sizeof...(Ts)> _n_columns = { Ts::n_columns... };
 
-            static constexpr size_t _sum (size_t i = 0U)
+            static constexpr size_t _sum (size_t i)
             {
                 if (i >= idx || i >= sizeof...(Ts)) {
                     return 0;
@@ -41,7 +41,7 @@ namespace zxorm {
             }
 
         public:
-            static constexpr size_t value = _sum();
+            static constexpr size_t value = _sum(0);
         };
 
         template<typename Target, typename ListHead, typename... ListTails>
@@ -102,7 +102,7 @@ namespace zxorm {
                 auto us_res = std::apply([&](const auto&... a) {
                     auto get_row = [&]<typename Pair>(const Pair&) {
                         // The pair here is a ColumnOffset template
-                        using selection_t = Pair::type;
+                        using selection_t = typename Pair::type;
                         using row_t = typename selection_t::result_t;
 
                         constexpr size_t offset = Pair::offset;
@@ -153,6 +153,8 @@ namespace zxorm {
         SelectQuery(sqlite3* handle, Logger logger) :
             Super(handle, logger) {}
 
+        SelectQuery(SelectQuery&& other) = default;
+
         auto& where(auto&&... args) {
             Super::where(std::forward<decltype(args)>(args)...);
             return *this;
@@ -174,8 +176,8 @@ namespace zxorm {
         requires(is_field<Field>)
         auto& order_by(order_t ord = order_t::ASC) {
             if (_order_clause.empty()) {
-                using column_t = Field::column_t;
-                using table_t = Field::table_t;
+                using column_t = typename Field::column_t;
+                using table_t = typename Field::table_t;
 
                 static_assert(table_is_selectable<table_t, SelectablesTuple>::value,
                         "Field for `order_by` must belong to a table present in the query");

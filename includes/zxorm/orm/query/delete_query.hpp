@@ -28,6 +28,8 @@ namespace zxorm {
         DeleteQuery(sqlite3* handle, Logger logger) :
             Super(handle, logger) {}
 
+        DeleteQuery(DeleteQuery&& other) = default;
+
         auto& where(auto&&... args) {
             Super::where(std::forward<decltype(args)>(args)...);
             return *this;

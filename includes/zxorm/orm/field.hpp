@@ -17,7 +17,7 @@ namespace zxorm {
 
     template <typename Table, FixedLengthString _name>
     struct Field : IsFieldTrait {
-        using column_t = typename Table::column_by_name<_name>::type;
+        using column_t = typename Table::template column_by_name<_name>::type;
         static_assert(not std::is_same_v<column_t, std::false_type>,
                 "No such field belonging to table");
 

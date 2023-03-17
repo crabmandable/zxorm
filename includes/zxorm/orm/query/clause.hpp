@@ -8,6 +8,7 @@ namespace zxorm {
     struct BindingClauseBase {
         std::string clause;
         BindingClauseBase(std::string clause) : clause{clause} {}
+        virtual ~BindingClauseBase() = default;
         virtual OptionalError bind(Statement& s) = 0;
     };
 
@@ -60,7 +61,7 @@ namespace zxorm {
     template<bool _is_optional, typename Table, FixedLengthString field_name>
     struct __selection<_is_optional, Field<Table, field_name>> {
         using table = Table;
-        using column_t = Field<Table, field_name>::column_t;
+        using column_t = typename Field<Table, field_name>::column_t;
         static constexpr bool is_optional = _is_optional;
         using field_type_t = typename column_t::member_t;
         using result_t = OptionalResult<field_type_t>;
@@ -102,7 +103,7 @@ namespace zxorm {
         static constexpr bool is_optional = false;
         using return_t = unsigned long;
         using result_t = OptionalResult<return_t>;
-        using table = Field::table_t;
+        using table = typename Field::table_t;
 
         // counts are never null
         static bool row_is_null(const auto&) { return false; }
