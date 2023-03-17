@@ -30,11 +30,10 @@ target_link_libraries(runTests pthread zxorm GTest::gtest_main)
 include(GoogleTest)
 gtest_discover_tests(runTests)
 
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-exceptions")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
 
 # set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wfatal-errors")
 
-target_compile_definitions(runTests PUBLIC ZXORM_FORCE_ERR_CHECK=1)
 target_compile_options(runTests PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>

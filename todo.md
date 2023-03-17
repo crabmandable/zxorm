@@ -1,12 +1,17 @@
 Note to self: start from top
 
 * Experiment with exceptions
+    * remove static creates
+    * Differentiate exception types
+
+* Negative tests
+
+* Docs
+    * Exceptions
 
 * Naming - Change queries to query builders, and prepared queries to queries
 
 * Reorganize code - need to split `clause` up, and try to clean up `connection`
-
-* Docs
 
 * Transaction tests
 

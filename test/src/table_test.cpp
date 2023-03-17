@@ -82,10 +82,7 @@ class TableTest : public ::testing::Test {
     protected:
     void SetUp() override {
         auto created_conn = connection_t::create("test.db", 0, 0, &logger);
-
-        ASSERT_TRUE(created_conn);
-
-        my_conn = std::make_shared<connection_t>(created_conn.value());
+        my_conn = std::make_shared<connection_t>(std::move(created_conn));
     }
 
     std::shared_ptr<connection_t> my_conn;

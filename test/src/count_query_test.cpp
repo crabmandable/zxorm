@@ -46,13 +46,9 @@ class CountQueryTest : public ::testing::Test {
     protected:
     void SetUp() override {
         auto created_conn = connection_t::create("test.db", 0, 0, &logger);
+        my_conn = std::make_shared<connection_t>(std::move(created_conn));
 
-        ASSERT_TRUE(created_conn);
-
-        my_conn = std::make_shared<connection_t>(created_conn.value());
-
-        auto err = my_conn->create_tables(true);
-        ASSERT_FALSE(err);
+        my_conn->create_tables(true);
     }
 
     std::shared_ptr<connection_t> my_conn;
@@ -68,21 +64,16 @@ TEST_F(CountQueryTest, CountColumnUsingSelectAndFrom) {
     std::vector<Object1> objs;
     objs.resize(10);
 
-    auto err = my_conn->insert_many_records(objs);
-    ASSERT_FALSE(err);
+    my_conn->insert_many_records(objs);
 
     auto query = my_conn->select_query<
         Select<Count<table1::field_t<"id">>>,
         From<table1>
     >().one();
-    ASSERT_FALSE(query.is_error());
 
-    auto result = query.value().exec();
+    auto result = query.exec();
 
-    if (result.is_error()) std::cout << result.error() << std::endl;
-    ASSERT_FALSE(result.is_error());
-
-    ASSERT_EQ(10, result.value());
+    ASSERT_EQ(10, result);
 }
 
 TEST_F(CountQueryTest, CountDistinctColumnUsingSelectAndFrom) {
@@ -99,92 +90,57 @@ TEST_F(CountQueryTest, CountDistinctColumnUsingSelectAndFrom) {
         { .text = "hello5" },
     };
 
-    auto err = my_conn->insert_many_records(objs);
-    ASSERT_FALSE(err);
+    my_conn->insert_many_records(objs);
 
-    auto query = my_conn->select_query<
+    auto result = my_conn->select_query<
         Select<CountDistinct<table1::field_t<"text">>>,
         From<table1>
-    >().one();
-    ASSERT_FALSE(query.is_error());
+    >().one().exec();
 
-    auto result = query.value().exec();
-
-    if (result.is_error()) std::cout << result.error() << std::endl;
-    ASSERT_FALSE(result.is_error());
-
-    ASSERT_EQ(5, result.value());
+    ASSERT_EQ(5, result);
 }
 
 TEST_F(CountQueryTest, CountFieldWithoutFrom) {
     std::vector<Object1> objs;
     objs.resize(10);
 
-    auto err = my_conn->insert_many_records(objs);
-    ASSERT_FALSE(err);
+    my_conn->insert_many_records(objs);
 
-    auto query = my_conn->select_query<Count<table1::field_t<"id">>>().one();
-    ASSERT_FALSE(query.is_error());
-
-    auto result = query.value().exec();
-
-    if (result.is_error()) std::cout << result.error() << std::endl;
-    ASSERT_FALSE(result.is_error());
-
-    ASSERT_EQ(10, result.value());
+    auto result = my_conn->select_query<Count<table1::field_t<"id">>>().one().exec();
+    ASSERT_EQ(10, result);
 }
 TEST_F(CountQueryTest, CountUsingTable) {
     std::vector<Object1> objs;
     objs.resize(10);
 
-    auto err = my_conn->insert_many_records(objs);
-    ASSERT_FALSE(err);
+    my_conn->insert_many_records(objs);
 
-    auto query = my_conn->select_query<Count<table1>>().one();
-    ASSERT_FALSE(query.is_error());
+    auto result = my_conn->select_query<Count<table1>>().one().exec();
 
-    auto result = query.value().exec();
-    if (result.is_error()) std::cout << result.error() << std::endl;
-    ASSERT_FALSE(result.is_error());
-
-    ASSERT_EQ(10, result.value());
+    ASSERT_EQ(10, result);
 }
 
 TEST_F(CountQueryTest, CountAllFrom) {
     std::vector<Object1> objs;
     objs.resize(10);
 
-    auto err = my_conn->insert_many_records(objs);
-    ASSERT_FALSE(err);
+    my_conn->insert_many_records(objs);
 
-    auto query = my_conn->select_query<CountAll, From<table1>>().one();
-    ASSERT_FALSE(query.is_error());
+    auto result = my_conn->select_query<CountAll, From<table1>>().one().exec();
 
-    auto result = query.value().exec();
-
-    if (result.is_error()) std::cout << result.error() << std::endl;
-    ASSERT_FALSE(result.is_error());
-
-    ASSERT_EQ(10, result.value());
+    ASSERT_EQ(10, result);
 }
 
 TEST_F(CountQueryTest, CountAndObjectWithinSelect) {
     std::vector<Object1> objs;
     objs.resize(10);
 
-    auto err = my_conn->insert_many_records(objs);
-    ASSERT_FALSE(err);
+    my_conn->insert_many_records(objs);
 
-    auto query = my_conn->select_query<Select<
+    auto result = my_conn->select_query<Select<
         Count<table1::field_t<"id">>, table1
-    >>().one();
-    ASSERT_FALSE(query.is_error());
-
-    auto result = query.value().exec();
-
-    if (result.is_error()) std::cout << result.error() << std::endl;
-    ASSERT_FALSE(result.is_error());
-
+    >>().one().exec();
+    ASSERT_TRUE(result.has_value());
     ASSERT_EQ(10, std::get<0>(result.value()));
     ASSERT_EQ(1, std::get<1>(result.value()).id);
 }
@@ -192,24 +148,15 @@ TEST_F(CountQueryTest, CountAndObjectWithinSelect) {
 TEST_F(CountQueryTest, CountWithGroupBy) {
     for (int i = 0; i < 10; i++) {
         Object1 obj = { .text = i % 2 ? "hello" : "goodbye" };
-        auto err = my_conn->insert_record(obj);
-        ASSERT_FALSE(err);
+        my_conn->insert_record(obj);
     }
 
-    auto query = my_conn->select_query<
+    auto results = my_conn->select_query<
         Select<CountAll, table1::field_t<"text">>,
         From<table1>
-    >().group_by<table1::field_t<"text">>().order_by<table1::field_t<"text">>(order_t::DESC).many();
-    ASSERT_FALSE(query.is_error());
+    >().group_by<table1::field_t<"text">>().order_by<table1::field_t<"text">>(order_t::DESC).many().exec();
 
-    auto results = query.value().exec();
-
-    if (results.is_error()) std::cout << results.error() << std::endl;
-    ASSERT_FALSE(results.is_error());
-
-    auto data = results.value().to_vector();
-    ASSERT_FALSE(data.is_error());
-    auto rows = std::move(data.value());
+    auto rows = results.to_vector();
     ASSERT_EQ(rows.size(), 2);
 
     auto row1 = rows[0];
@@ -227,60 +174,39 @@ TEST_F(CountQueryTest, CountWithGroupBy) {
 
 TEST_F(CountQueryTest, CountDistinct) {
     Object1 obj = { .text = "hello" };
-    auto err = my_conn->insert_record(obj);
-    ASSERT_FALSE(err);
+    my_conn->insert_record(obj);
 
     obj = { .text = "goodbye" };
-    err = my_conn->insert_record(obj);
-    ASSERT_FALSE(err);
+    my_conn->insert_record(obj);
 
     for (int i = 0; i < 10; i++) {
         Object2 obj = { .obj1_id = i % 2 ? 1 : 2 };
-        auto err = my_conn->insert_record(obj);
-        ASSERT_FALSE(err);
+        my_conn->insert_record(obj);
     }
 
-    auto query = my_conn->select_query<CountDistinct<table2::field_t<"obj1_id">>>().one();
-    ASSERT_FALSE(query.is_error());
-
-    auto result = query.value().exec();
-
-    if (result.is_error()) std::cout << result.error() << std::endl;
-    ASSERT_FALSE(result.is_error());
-    ASSERT_TRUE(result.has_value());
-
-    ASSERT_EQ(2, result.value());
+    auto result = my_conn->select_query<CountDistinct<table2::field_t<"obj1_id">>>().one().exec();
+    ASSERT_EQ(2, result);
 }
 
 TEST_F(CountQueryTest, CountWithJoin) {
     Object1 obj = { .text = "hello" };
-    auto err = my_conn->insert_record(obj);
-    ASSERT_FALSE(err);
+    my_conn->insert_record(obj);
 
     obj = { .text = "goodbye" };
-    err = my_conn->insert_record(obj);
-    ASSERT_FALSE(err);
+    my_conn->insert_record(obj);
 
     for (int i = 0; i < 10; i++) {
         Object2 obj = { .obj1_id = i % 2 ? 1 : 2 };
-        auto err = my_conn->insert_record(obj);
-        ASSERT_FALSE(err);
+        my_conn->insert_record(obj);
     }
 
-    auto query = my_conn->select_query<
+    auto results = my_conn->select_query<
         Select<Count<Object2>, table1::field_t<"text">>,
         From<Object1>,
         Join<Object2>
-    >().group_by<table1>().many();
-    ASSERT_FALSE(query.is_error());
+    >().group_by<table1>().many().exec();
 
-    auto results = query.value().exec();
-    if (results.is_error()) std::cout << results.error() << std::endl;
-    ASSERT_FALSE(results.is_error());
-
-    auto data = results.value().to_vector();
-    ASSERT_FALSE(data.is_error());
-    auto rows = std::move(data.value());
+    auto rows = results.to_vector();
     ASSERT_EQ(rows.size(), 2);
 
     auto row1 = rows[0];
@@ -298,20 +224,15 @@ TEST_F(CountQueryTest, CountWithJoin) {
 
 TEST_F(CountQueryTest, CountWithWhere) {
     Object1 obj = { .text = "hello" };
-    auto err = my_conn->insert_record(obj);
-    ASSERT_FALSE(err);
+    my_conn->insert_record(obj);
 
     obj = { .text = "goodbye" };
-    err = my_conn->insert_record(obj);
+    my_conn->insert_record(obj);
     obj.id = 0;
-    err = my_conn->insert_record(obj);
-    ASSERT_FALSE(err);
+    my_conn->insert_record(obj);
 
-    auto query = my_conn->select_query<CountAll, From<Object1>>()
-        .where_one(table1::field_t<"text">().like("goodbye"));
-    ASSERT_FALSE(query.is_error());
+    auto result = my_conn->select_query<CountAll, From<Object1>>()
+        .where_one(table1::field_t<"text">().like("goodbye")).exec();
 
-    auto result = query.value().exec();
-    ASSERT_FALSE(result.is_error());
-    ASSERT_EQ(2, result.value());
+    ASSERT_EQ(2, result);
 }

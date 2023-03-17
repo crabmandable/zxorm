@@ -6,7 +6,6 @@
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/orm/expression.hpp"
-#include "zxorm/result.hpp"
 #include "zxorm/orm/field.hpp"
 #include "zxorm/orm/query/select_query.hpp"
 #include "zxorm/orm/query/delete_query.hpp"
@@ -76,7 +75,6 @@ namespace zxorm {
         struct selections_are_selectable;
 
         void log_error(const Error& err);
-        inline void log_error(const OptionalError& err);
 
         template<class SelectOrTable, typename From=void, class... Clauses>
         auto make_select_query();
@@ -85,12 +83,12 @@ namespace zxorm {
         auto make_delete_query();
 
         auto make_statement(const std::string& query);
-        auto exec(const std::string& query) -> OptionalError;
+        void exec(const std::string& query);
 
         // The conditional makes it impossible to deduce the type T apparently :(
         // so the public inserts call this implementation
         template<class T>
-            [[nodiscard]] OptionalError insert_record_impl (
+            void insert_record_impl (
                     std::conditional_t<table_has_rowid<T>(), T&, const T&> record);
 
     public:
@@ -106,7 +104,7 @@ namespace zxorm {
         using table_for_name_t = typename table_for_name<name>::type;
 
 
-        static Result<Connection<Table...>> create(
+        static Connection<Table...> create(
                 const char* file_name, int flags = 0, const char* z_vfs = nullptr, Logger logger = nullptr);
 
         Connection(Connection&& old) = default;
@@ -114,17 +112,16 @@ namespace zxorm {
         Connection(const Connection&) = delete;
         Connection operator =(const Connection&) = delete;
 
-        OptionalError create_tables(bool if_not_exist = true);
-        Result<size_t> count_tables();
+        void create_tables(bool if_not_exist = true);
+        size_t count_tables();
 
-        // TODO needs tests
-        OptionalError transaction(std::function<OptionalError()> run);
-
-        template<class T>
-            OptionalError update_record (const T& record);
+        void transaction(std::function<void()> run);
 
         template<class T>
-            OptionalError insert_record (const T& record)
+            void update_record (const T& record);
+
+        template<class T>
+            void insert_record (const T& record)
             { return insert_record_impl<T>(record); }
 
         // when the table has a rowid column
@@ -132,27 +129,27 @@ namespace zxorm {
         // therefore the record should not be const
         template<class T>
             requires (table_has_rowid<T>())
-            OptionalError insert_record (T& record)
+            void insert_record (T& record)
             { return insert_record_impl<T>(record); }
 
         // matches stl containers, allowing template arg deduction
         template<template<typename, typename> typename Container, typename T, typename Allocator>
-            OptionalError insert_many_records (const Container<T, Allocator>& records, size_t batch_size = 10)
+            void insert_many_records (const Container<T, Allocator>& records, size_t batch_size = 10)
             { return insert_many_records<T>(records, batch_size); }
 
         // matches std::array, allowing template arg deduction
         template<template<typename, auto> typename Container, typename T, auto size>
-            OptionalError insert_many_records (const Container<T, size>& records, size_t batch_size = 10)
+            void insert_many_records (const Container<T, size>& records, size_t batch_size = 10)
             { return insert_many_records<T>(records, batch_size); }
 
         template<typename T, IndexableContainer<T> Container>
-            OptionalError insert_many_records (const Container& records, size_t batch_size = 10);
+            void insert_many_records (const Container& records, size_t batch_size = 10);
 
         template<class T, typename PrimaryKeyType>
-            [[nodiscard]] OptionalResult<T> find_record(const PrimaryKeyType& id);
+            [[nodiscard]] std::optional<T> find_record(const PrimaryKeyType& id);
 
         template<class T, typename PrimaryKeyType>
-            OptionalError delete_record(const PrimaryKeyType& id);
+            void delete_record(const PrimaryKeyType& id);
 
         template<class Select, typename From=void, class... Clauses>
             [[nodiscard]] auto select_query();
@@ -168,11 +165,11 @@ namespace zxorm {
         [[nodiscard]] auto last();
 
         template<class T>
-        OptionalError truncate();
+        void truncate();
     };
 
     template <class... Table>
-    Result<Connection<Table...>> Connection<Table...>::create(
+    Connection<Table...> Connection<Table...>::create(
             const char* file_name,
             int flags,
             const char* z_vfs,
@@ -191,12 +188,11 @@ namespace zxorm {
         sqlite3* db_handle = nullptr;
         int result = sqlite3_open_v2(file_name, &db_handle, flags, z_vfs);
         if (result != SQLITE_OK || !db_handle) {
-            const char* str = db_handle ? sqlite3_errmsg(db_handle) : sqlite3_errstr(result);
+            auto err = ConnectionError("Unable to open sqlite connection", db_handle);
             if (logger) {
-                logger(log_level::Error, "Unable to open sqlite connection");
-                logger(log_level::Error, str);
+                logger(log_level::Error, err);
             }
-            return Error("Unable to open sqlite connection", db_handle);
+            throw err;
         }
 
         return Connection({db_handle}, logger);
@@ -211,11 +207,11 @@ namespace zxorm {
         _db_handle = {db_handle, [logger](sqlite3* handle) {
             int result = sqlite3_close_v2(handle);
             if (result != SQLITE_OK) {
-                const char* str = sqlite3_errmsg(handle);
+                auto err = ConnectionError("Unable to destroy connection", handle);
                 if (logger) {
-                    logger(log_level::Error, "Unable to destruct connection");
-                    logger(log_level::Error, str);
+                    logger(log_level::Error, err);
                 }
+                throw err;
             }
         }};
     }
@@ -574,11 +570,10 @@ namespace zxorm {
     }
 
     template <class... Table>
-    auto Connection<Table...>::exec(const std::string& query) -> OptionalError
+    void Connection<Table...>::exec(const std::string& query)
     {
         auto stmt = make_statement(query);
-        if (stmt.is_error()) return stmt.error();
-        return stmt.value().step();
+        stmt.step();
     }
 
     template <class... Table>
@@ -588,34 +583,22 @@ namespace zxorm {
     }
 
     template <class... Table>
-    inline void Connection<Table...>::log_error(const OptionalError& err)
+    void Connection<Table...>::transaction(std::function<void()> run)
     {
-        if (err) {
-            log_error(err.value());
-        }
-    }
-
-    template <class... Table>
-    OptionalError Connection<Table...>::transaction(std::function<OptionalError()> run)
-    {
-        ZXORM_TRY(exec("BEGIN TRANSACTION;"));
-
-        auto err = run();
-        if (err) {
-            auto rollback_err = exec("ROLLBACK TRANSACTION;");
-            if (rollback_err) {
-                _logger(log_level::Error, "Unable to rollback transaction during error handling");
-                log_error(rollback_err);
-            }
-            return err;
+        exec("BEGIN TRANSACTION;");
+        try {
+            run();
+        } catch(const zxorm::Error& err) {
+            exec("ROLLBACK TRANSACTION;");
+            throw;
         }
 
-        return exec("COMMIT TRANSACTION;");
+        exec("COMMIT TRANSACTION;");
     };
 
     template <class... Table>
     template<class T>
-    OptionalError Connection<Table...>::update_record (const T& record)
+    void Connection<Table...>::update_record (const T& record)
     {
         using table_t = table_for_class_t<T>;
         static_assert(table_t::has_primary_key, "Cannot execute an update on a table without a primary key");
@@ -624,55 +607,46 @@ namespace zxorm {
 
         if constexpr (table_has_rowid<T>()) {
             if (!pk) {
-                return Error("Cannot update record with unknown rowid");
+                throw Error("Cannot update record with unknown rowid");
             }
         }
 
         auto& stmt = _update_statement_cache[table_t::name.value];
         if (!stmt) {
-            auto query = table_t::update_query();
-            ZXORM_GET_RESULT(Statement update_stmt, make_statement(query));
+            Statement update_stmt = make_statement(table_t::update_query());
             stmt = std::make_shared<Statement>(std::move(update_stmt));
         } else {
-            ZXORM_TRY(stmt->reset());
+            stmt->reset();
         }
 
         int i = 1;
-        OptionalError err;
         std::apply([&]<typename... U>(const U&...) {
             ([&]() {
-                if (err) return;
                 if constexpr (not U::is_primary_key) {
                     auto& val = U::getter(record);
-                    err = stmt->bind(i++, val);
+                    stmt->bind(i++, val);
                 }
 
             }(), ...);
         }, typename table_t::columns_t{});
 
-        if (err) {
-            return err;
+        stmt->bind(i++, pk);
+        stmt->step();
+
+        if (!stmt->done()) [[unlikely]] {
+            throw Error("Update query didn't run to completion");
         }
-
-        ZXORM_TRY(stmt->bind(i++, pk));
-        ZXORM_TRY(stmt->step());
-
-        if (!stmt->done()) {
-            return Error("Update query didn't run to completion");
-        }
-
-        return std::nullopt;
     }
 
     template <class... Table>
     template<typename T, IndexableContainer<T> Container>
-    OptionalError Connection<Table...>::insert_many_records (const Container& records, size_t batch_size)
+    void Connection<Table...>::insert_many_records (const Container& records, size_t batch_size)
     {
         using table_t = table_for_class_t<T>;
-        return transaction([&]() -> OptionalError {
+        return transaction([&]() {
             size_t inserted = 0;
-            // this error should always be overwritten
-            Result<Statement> insert_stmt = Error("Uninitialized statement");
+            // this should always be set
+            std::optional<Statement> insert_stmt;
 
             while (inserted < records.size()) {
                 // iteration is less than batch size, query needs to be [re-]initialized
@@ -680,58 +654,44 @@ namespace zxorm {
                     batch_size = records.size() - inserted;
                     auto query = table_t::insert_query(batch_size);
                     insert_stmt = make_statement(query);
-                    if (insert_stmt.is_error()) {
-                        return insert_stmt.error();
-                    }
                 }
                 // first itertion, initiaize statment
                 else if (inserted == 0) {
                     auto query = table_t::insert_query(batch_size);
                     insert_stmt = make_statement(query);
-                    if (insert_stmt.is_error()) {
-                        return insert_stmt.error();
-                    }
                 // subsequent iterations just reset the same query
                 } else {
-                    ZXORM_TRY(insert_stmt.value().reset());
+                    insert_stmt.value().reset();
                 }
 
 
                 int i = 1;
                 for (size_t row = 0; row < batch_size; row++) {
-                    OptionalError err;
                     std::apply([&]<typename... U>(const U&...) {
                         ([&]() {
-                            if (err) return;
                             if constexpr (!U::is_auto_inc_column) {
                                 const auto& val = U::getter(records[row + inserted]);
-                                err = insert_stmt.value().bind(i++, val);
+                                insert_stmt.value().bind(i++, val);
                             }
 
                         }(), ...);
                     }, typename table_t::columns_t{});
-
-                    if (err) {
-                        return err;
-                    }
                 }
 
-                ZXORM_TRY(insert_stmt.value().step());
+                insert_stmt.value().step();
 
-                if (!insert_stmt.value().done()) {
-                    return Error("Insert query didn't run to completion");
+                if (!insert_stmt.value().done()) [[unlikely]] {
+                    throw Error("Insert query didn't run to completion");
                 }
 
                 inserted += batch_size;
             }
-
-            return std::nullopt;
         });
     }
 
     template <class... Table>
     template<class T>
-    OptionalError Connection<Table...>::insert_record_impl (
+    void Connection<Table...>::insert_record_impl (
         std::conditional_t<table_has_rowid<T>(), T&, const T&> record)
     {
         using table_t = table_for_class_t<T>;
@@ -740,81 +700,64 @@ namespace zxorm {
 
         if (!stmt) {
             auto query = table_t::insert_query();
-            ZXORM_GET_RESULT(Statement insert_stmt, make_statement(query));
+            Statement insert_stmt = make_statement(query);
             stmt = std::make_shared<Statement>(std::move(insert_stmt));
         } else {
-            ZXORM_TRY(stmt->reset());
+            stmt->reset();
         }
 
 
         int i = 1;
-        OptionalError err;
         std::apply([&]<typename... U>(const U&...) {
             ([&]() {
-                if (err) return;
-
                 if constexpr (!U::is_auto_inc_column) {
                     auto& val = U::getter(record);
-                    err = stmt->bind(i++, val);
+                    stmt->bind(i++, val);
                 }
 
             }(), ...);
         }, typename table_t::columns_t{});
 
-        if (err) {
-            return err;
-        }
+        stmt->step();
 
-        ZXORM_TRY(stmt->step());
-
-        if (!stmt->done()) {
-            return Error("Insert query didn't run to completion");
+        if (!stmt->done()) [[unlikely]] {
+            throw Error("Insert query didn't run to completion");
         }
 
         if constexpr (table_has_rowid<T>()) {
             int64_t value = sqlite3_last_insert_rowid(_db_handle.get());
             table_t::primary_key_t::setter(record, value);
         }
-
-        return std::nullopt;
     }
 
     template <class... Table>
-    OptionalError Connection<Table...>::create_tables(bool if_not_exist)
+    void Connection<Table...>::create_tables(bool if_not_exist)
     {
-
-        std::array<Result<Statement>,  sizeof...(Table)> statements =
+        std::array<Statement,  sizeof...(Table)> statements =
             { make_statement(Table::create_table_query(if_not_exist))... };
 
-        return transaction([&]() -> OptionalError {
+        return transaction([&]() {
             for (auto& s : statements) {
-                if (!s) {
-                    return s.error();
-                }
-                ZXORM_TRY(s.value().step());
+                s.step();
             }
-
-            return std::nullopt;
         });
     }
 
     template <class... Table>
-    Result<size_t> Connection<Table...>::count_tables()
+    size_t Connection<Table...>::count_tables()
     {
-        ZXORM_GET_RESULT(
-                auto count_stmt,
-                make_statement("SELECT COUNT(*) FROM `sqlite_schema` WHERE `type` = 'table';"));
+        auto count_stmt = make_statement("SELECT COUNT(*) FROM `sqlite_schema` WHERE `type` = 'table';");
 
-        ZXORM_TRY(count_stmt.step());
+        count_stmt.step();
 
         ssize_t count;
-        ZXORM_TRY(count_stmt.read_column(0, count));
+        count_stmt.read_column(0, count);
         return count;
     }
 
     template <class... Table>
     template<class T, typename PrimaryKeyType>
-    OptionalResult<T> Connection<Table...>::find_record(const PrimaryKeyType& id)
+    std::optional<T> Connection<Table...>::find_record(const PrimaryKeyType& id)
     {
         using table_t = table_for_class_t<T>;
         static_assert(table_t::has_primary_key, "Cannot execute a find on a table without a primary key");
@@ -828,13 +771,13 @@ namespace zxorm {
         auto& cache_item = _query_cache[table_name][QueryCacheType::find_record];
 
         auto e = Field<table_t, primary_key_t::name>() == id;
-        using query_t = std::remove_reference_t<decltype(make_select_query<T>().where_one(e).value())>;
+        using query_t = decltype(make_select_query<T>().where_one(e));
 
         if (!cache_item) {
-            ZXORM_GET_RESULT(auto query, make_select_query<T>().where_one(e));
+            auto query = make_select_query<T>().where_one(e);
             cache_item = std::make_shared<query_t>(std::move(query));
         } else {
-            ZXORM_TRY(std::static_pointer_cast<query_t>(cache_item)->rebind(id));
+            std::static_pointer_cast<query_t>(cache_item)->rebind(id);
         }
 
         return std::static_pointer_cast<query_t>(cache_item)->exec();
@@ -842,7 +785,7 @@ namespace zxorm {
 
     template <class... Table>
     template<class T, typename PrimaryKeyType>
-    OptionalError Connection<Table...>::delete_record(const PrimaryKeyType& id)
+    void Connection<Table...>::delete_record(const PrimaryKeyType& id)
     {
         using table_t = table_for_class_t<T>;
 
@@ -857,13 +800,13 @@ namespace zxorm {
         auto& cache_item = _query_cache[table_name][QueryCacheType::delete_record];
 
         auto e = Field<table_t, primary_key_t::name>() == id;
-        using query_t = std::remove_reference_t<decltype(make_delete_query<T>().where(e).value())>;
+        using query_t = decltype(make_delete_query<T>().where(e));
 
         if (!cache_item) {
-            ZXORM_GET_RESULT(auto query, make_delete_query<T>().where(e));
+            auto query = make_delete_query<T>().where(e);
             cache_item = std::make_shared<query_t>(std::move(query));
         } else {
-            ZXORM_TRY(std::static_pointer_cast<query_t>(cache_item)->rebind(id));
+            std::static_pointer_cast<query_t>(cache_item)->rebind(id);
         }
 
         return std::static_pointer_cast<query_t>(cache_item)->exec();
@@ -888,16 +831,13 @@ namespace zxorm {
     auto Connection<Table...>::first()
     {
         using table_t = table_for_class_t<T>;
-        using query_t = std::remove_reference_t<decltype(make_select_query<T>().one().value())>;
+        using query_t = decltype(make_select_query<T>().one());
 
         auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::first];
 
         if (!cache_item) {
             auto query = make_select_query<T>().one();
-            if (query.is_error()) {
-                return OptionalResult<typename table_t::object_class>(query.error());
-            }
-            cache_item = std::make_shared<query_t>(std::move(query.value()));
+            cache_item = std::make_shared<query_t>(std::move(query));
         }
 
         return std::static_pointer_cast<query_t>(cache_item)->exec();
@@ -908,17 +848,14 @@ namespace zxorm {
     auto Connection<Table...>::last()
     {
         using table_t = table_for_class_t<T>;
-        using query_t = std::remove_reference_t<decltype(make_select_query<T>().one().value())>;
+        using query_t = decltype(make_select_query<T>().one());
         using pk_field = Field<table_t, table_t::primary_key_t::name>;
 
         auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::last];
 
         if (!cache_item) {
             auto query = make_select_query<T>().template order_by<pk_field>(order_t::DESC).one();
-            if (query.is_error()) {
-                return OptionalResult<typename table_t::object_class>(query.error());
-            }
-            cache_item = std::make_shared<query_t>(std::move(query.value()));
+            cache_item = std::make_shared<query_t>(std::move(query));
         }
 
         return std::static_pointer_cast<query_t>(cache_item)->exec();
@@ -926,15 +863,9 @@ namespace zxorm {
 
     template <class... Table>
     template<class T>
-    OptionalError Connection<Table...>::truncate()
+    void Connection<Table...>::truncate()
     {
         using table_t = table_for_class_t<T>;
-
-        ZXORM_GET_RESULT(
-            auto stmt,
-            make_statement(std::string("DELETE FROM `") + table_t::name.value + "`;")
-        );
-
-        return stmt.step();
+        exec(std::string("DELETE FROM `") + table_t::name.value + "`;");
     }
 };

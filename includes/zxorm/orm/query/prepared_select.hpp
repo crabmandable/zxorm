@@ -2,9 +2,9 @@
 
 
 #include <memory>
+#include <optional>
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
-#include "zxorm/result.hpp"
 #include "zxorm/orm/query/query.hpp"
 #include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/orm/table.hpp"
@@ -77,20 +77,20 @@ namespace zxorm {
         using return_t = typename Select::return_t;
         template<size_t record_index, typename T>
         requires (std::tuple_element_t<record_index, typename Select::selections_tuple>::is_optional)
-        static auto row_res_to_row (const OptionalResult<T>& row_res) -> std::optional<T> {
-            if (row_res.has_value()) {
-                return row_res.value();
+        static auto row_res_to_row (const std::optional<T>& row_res) -> std::optional<T> {
+            if (row_res) {
+                return row_res;
             }
 
             return std::nullopt;
         }
 
         template<size_t record_index, typename T>
-        static auto row_res_to_row (const OptionalResult<T>& row_res) -> T {
+        static auto row_res_to_row (const std::optional<T>& row_res) -> T {
             return row_res.value();
         }
 
-        static auto read_row(Statement& s) -> Result<return_t>
+        static auto read_row(Statement& s) -> return_t
         {
             if constexpr (std::tuple_size_v<typename Select::selections_tuple> == 1) {
                 using selection = std::tuple_element_t<0, typename Select::selections_tuple>;
@@ -100,14 +100,12 @@ namespace zxorm {
                     auto get_row = [&]<typename Pair>(const Pair&) {
                         // The pair here is a ColumnOffset template
                         using selection_t = typename Pair::type;
-                        using row_t = typename selection_t::result_t;
+                        using row_t = std::optional<typename selection_t::result_t>;
 
                         constexpr size_t offset = Pair::offset;
                         auto row = selection_t::get_row(s, offset);
 
-                        if (row.is_error()) return row_t{std::move(row)};
-
-                        if (selection_t::row_is_null(row.value()))
+                        if (selection_t::row_is_null(row))
                         {
                             return row_t{std::nullopt};
                         }
@@ -122,37 +120,22 @@ namespace zxorm {
                 }, with_offsets_t<typename Select::selections_tuple>{});
 
 
-                OptionalResult<return_t> us = std::nullopt;
+                std::optional<return_t> us = std::nullopt;
 
                 std::apply([&](const auto&... a) {
-                    // if an error is in here we should return it
-                    ([&]() {
-                        if (!us.is_error() && a.is_error()) {
-                            us = a.error();
-                        }
-                     }(), ...);
-
-                    // if there is no error, set the values
-                    if (!us.is_error()) {
-                        us = { row_res_to_row<tuple_index<decltype(a), std::tuple<decltype(a)...>>::value>(a)... };
-                    }
+                    us = { row_res_to_row<tuple_index<decltype(a), std::tuple<decltype(a)...>>::value>(a)... };
                 }, us_res);
-
-                if (us.is_error()) {
-                    return us.error();
-                }
 
                 return us.value();
             }
         }
 
     public:
-        OptionalError rebind(auto&&... bindings) {
+        void rebind(auto&&... bindings) {
             _bindings = Bindings{std::forward<decltype(bindings)>(bindings)...};
 
-            ZXORM_TRY(_stmt->reset());
-            ZXORM_TRY(_stmt->bind(_bindings));
-            return std::nullopt;
+            _stmt->reset();
+            _stmt->bind(_bindings);
         }
     };
 
@@ -163,9 +146,9 @@ namespace zxorm {
         PreparedSelectOne(std::shared_ptr<Statement> stmt): Super(stmt) {};
         PreparedSelectOne(PreparedSelectOne&&) = default;
 
-        auto exec() -> OptionalResult<typename Select::return_t> {
-            ZXORM_TRY(Super::_stmt->rewind());
-            ZXORM_TRY(Super::_stmt->step());
+        auto exec() -> std::optional<typename Select::return_t> {
+            Super::_stmt->rewind();
+            Super::_stmt->step();
             if (Super::_stmt->done()) {
                 return std::nullopt;
             }
@@ -182,9 +165,9 @@ namespace zxorm {
         PreparedSelectMany(std::shared_ptr<Statement> stmt): Super(stmt) {};
         PreparedSelectMany(PreparedSelectMany&&) = default;
 
-        auto exec() -> Result<RecordIterator<typename Select::return_t>>
+        auto exec() -> RecordIterator<typename Select::return_t>
         {
-            ZXORM_TRY(Super::_stmt->rewind());
+            Super::_stmt->rewind();
             return RecordIterator<typename Select::return_t>(Super::_stmt, Super::read_row);
         }
     };

@@ -30,7 +30,7 @@ namespace zxorm {
             _stmt = {stmt, [logger, handle](sqlite3_stmt* s) {
                 int result = sqlite3_finalize(s);
                 if (result != SQLITE_OK) {
-                    auto err = Error("Unable to finalize statement", handle);
+                    auto err = SQLiteError("Unable to finalize statement", handle);
                     logger(log_level::Error, err);
                 }
             }};
@@ -42,7 +42,7 @@ namespace zxorm {
         }
 
         public:
-        [[nodiscard]] static Result<Statement> create(sqlite3* handle, Logger logger, const std::string& query)
+        [[nodiscard]] static Statement create(sqlite3* handle, Logger logger, const std::string& query)
         {
             logger(log_level::Debug, "Initializing statement");
             logger(log_level::Debug, query.c_str());
@@ -50,35 +50,32 @@ namespace zxorm {
             sqlite3_stmt* stmt = nullptr;
             int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
-                auto err = Error("Unable to initialize statement", handle);
+                auto err = SQLiteError("Unable to initialize statement", handle);
                 logger(log_level::Error, err);
+                throw err;
             }
 
             return Statement(handle, logger, stmt);
         }
 
-        [[nodiscard]] OptionalError bind(auto tuple)
+        void bind(auto tuple)
         {
-            OptionalError err;
             size_t i = 1;
             std::apply([&](const auto&... binding) {
                 ([&]() {
-                    if (err) return;
                     if constexpr (is_multi_value_binding<std::remove_cvref_t<decltype(binding)>>::value) {
-                        for (size_t j = 0; j < binding.size() && !err; j++) {
-                            err = bind(i++, binding[j]);
+                        for (size_t j = 0; j < binding.size(); j++) {
+                            bind(i++, binding[j]);
                         }
                     } else {
-                        err = bind(i++, binding);
+                        bind(i++, binding);
                     }
                 }(), ...);
             }, tuple);
-
-            return err;
         }
 
         template <ArithmeticT T>
-        [[nodiscard]] OptionalError bind(size_t idx, const T& param)
+        void bind(size_t idx, const T& param)
         {
             // bindings start at 1 :(
             assert(idx != 0);
@@ -110,14 +107,13 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                return Error("Unable to bind parameter to statment", _handle);
+                throw SQLiteError("Unable to bind parameter to statment", _handle);
             }
             _is_bound[idx] = true;
-            return std::nullopt;
         }
 
         template <ContinuousContainer T>
-        [[nodiscard]] OptionalError bind(size_t idx, const T& param)
+        void bind(size_t idx, const T& param)
         {
             assert(idx != 0);
             bool bound_null = false;
@@ -141,74 +137,66 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                return Error("Unable to bind parameter to statment", _handle);
+                throw SQLiteError("Unable to bind parameter to statment", _handle);
             }
 
             _is_bound[idx] = true;
-
-            return std::nullopt;
         }
 
-        [[nodiscard]] OptionalError rewind() {
+        void rewind() {
             int result = sqlite3_reset(_stmt.get());
             if (result != SQLITE_OK) {
-                return Error( "Unable to reset statment", _handle);
+                throw SQLiteError( "Unable to reset statment", _handle);
             }
             _done = false;
             _step_count = 0;
-            return std::nullopt;
         }
 
-        [[nodiscard]] OptionalError reset() {
-            auto err = rewind();
-            if (err) return err;
+        void reset() {
+            rewind();
 
             int result = sqlite3_clear_bindings(_stmt.get());
             if (result != SQLITE_OK) {
-                return Error( "Unable to clear bindings", _handle);
+                throw SQLiteError( "Unable to clear bindings", _handle);
             }
             for (auto& [_, v] : _is_bound) v = false;
-
-            return std::nullopt;
         }
 
-        [[nodiscard]] OptionalError step() {
+        void step() {
             if (_done) {
-                return Error("Query has run to completion");
+                throw Error("Query has run to completion");
             }
             if (std::any_of(_is_bound.cbegin(), _is_bound.cend(),
                         [](const auto& bound) { return !bound.second; } )) {
-                return Error("Some parameters have not been bound");
+                throw Error("Some parameters have not been bound");
             }
 
             int result = sqlite3_step(_stmt.get());
             _step_count++;
             if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
-                return Error("Unable to execute statment", _handle);
+                throw SQLiteError("Unable to execute statment", _handle);
             }
 
             _done = result == SQLITE_DONE;
 
             _column_count = sqlite3_column_count(_stmt.get());
-
-            return std::nullopt;
         }
 
         template<ContinuousContainer T>
-        [[nodiscard]] OptionalError read_column(size_t idx, T& out_param) {
+        void read_column(size_t idx, T& out_param) {
             auto out = MetaContainer<T>(out_param);
             int data_type = sqlite3_column_type(_stmt.get(), idx);
             switch(data_type) {
                 case SQLITE_INTEGER:
                 case SQLITE_FLOAT: {
-                    return Error("Tried to read an arithmetic column into a container");
+                    throw Error("Tried to read an arithmetic column into a container");
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
                     const void* data = sqlite3_column_blob(_stmt.get(), idx);
                     size_t len = sqlite3_column_bytes(_stmt.get(), idx);
                     if (!out.resize(len)) {
-                        return Error("Container does not have enough space to read column data");
+                        throw Error("Container does not have enough space to read column data");
                     }
                     std::memcpy(out.data(), data, len);
                     break;
@@ -220,14 +208,13 @@ namespace zxorm {
                 default: {
                     // this should never happen :pray:
                     assert(false);
-                    return Error("Unknown SQL type encountered, something isn't implemented yet");
+                    throw Error("Unknown SQL type encountered, something isn't implemented yet");
                 }
             }
-            return std::nullopt;
         }
 
         template<ArithmeticT T>
-        [[nodiscard]] OptionalError read_column(size_t idx, T& out_param) {
+        void read_column(size_t idx, T& out_param) {
             int data_type = sqlite3_column_type(_stmt.get(), idx);
             switch(data_type) {
                 case SQLITE_INTEGER: {
@@ -244,10 +231,10 @@ namespace zxorm {
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
-                    return Error("Tried to read an arithmetic column into a container");
+                    throw Error("Tried to read an arithmetic column into a container");
                     size_t len = sqlite3_column_bytes(_stmt.get(), idx);
                     if (len > sizeof(T)) {
-                        return Error("Param does not have enough space to fit column contents");
+                        throw Error("Param does not have enough space to fit column contents");
                     }
                     const void* data = sqlite3_column_blob(_stmt.get(), idx);
                     std::memcpy(&out_param, data, len);
@@ -264,11 +251,9 @@ namespace zxorm {
                 default: {
                     // this should never happen :pray:
                     assert(false);
-                    return Error("Unknown SQL type encountered, something isn't implemented yet");
+                    throw Error("Unknown SQL type encountered, something isn't implemented yet");
                 }
             }
-
-            return std::nullopt;
         }
 
         int column_count() { return _column_count; }

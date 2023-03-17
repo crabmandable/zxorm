@@ -60,59 +60,41 @@ class TableCreationTest : public ::testing::Test {
 template<typename... T>
 auto make_connection() -> std::shared_ptr<Connection<T...>> {
     using connection_t = Connection<T...>;
-    auto created_conn = connection_t::create("test.db", 0, 0, &logger);
-    if (!created_conn) {
-        return nullptr;
-    }
-    return std::make_shared<connection_t>(created_conn.value());
+    return std::make_shared<connection_t>(std::move(connection_t::create("test.db", 0, 0, &logger)));
 }
 
 TEST_F(TableCreationTest, CreateTables) {
     auto my_conn = make_connection<table_one_t>();
-    auto err = my_conn->create_tables(false);
-    if (err) std::cout << std::string(err.value()) << std::endl;
-    ASSERT_FALSE(err);
+    my_conn->create_tables(false);
     auto count = my_conn->count_tables();
-    ASSERT_FALSE(count.is_error());
-    ASSERT_EQ(count.value(), 1);
+    ASSERT_EQ(count, 1);
 }
 
 TEST_F(TableCreationTest, CreateIfExistsTables) {
     auto my_conn = make_connection<table_one_t>();
-    auto err = my_conn->create_tables(true);
-    if (err) std::cout << std::string(err.value()) << std::endl;
-    ASSERT_FALSE(err);
+    my_conn->create_tables(true);
 
     auto count = my_conn->count_tables();
-    ASSERT_FALSE(count.is_error());
-    ASSERT_EQ(count.value(), 1);
+    ASSERT_EQ(count, 1);
 
-    err = my_conn->create_tables(true);
-    if (err) std::cout << std::string(err.value()) << std::endl;
-    ASSERT_FALSE(err);
+    my_conn->create_tables(true);
 
     count = my_conn->count_tables();
-    ASSERT_FALSE(count.is_error());
-    ASSERT_EQ(count.value(), 1);
+    ASSERT_EQ(count, 1);
 }
 
 TEST_F(TableCreationTest, CreateManyTables) {
     auto my_conn = make_connection<table_one_t, table_two_t, table_three_t>();
-    auto err = my_conn->create_tables(false);
-    if (err) std::cout << std::string(err.value()) << std::endl;
-    ASSERT_FALSE(err);
+    my_conn->create_tables(false);
 
     auto count = my_conn->count_tables();
-    ASSERT_FALSE(count.is_error());
-    ASSERT_EQ(count.value(), 3);
+    ASSERT_EQ(count, 3);
 }
 
 TEST_F(TableCreationTest, AllOrNothingTransaction) {
     auto my_conn = make_connection<table_one_t, table_one_t, table_three_t>();
-    auto err = my_conn->create_tables(false);
-    ASSERT_TRUE(err.has_value());
+    EXPECT_THROW(my_conn->create_tables(false), SQLiteError);
 
     auto count = my_conn->count_tables();
-    ASSERT_FALSE(count.is_error());
-    ASSERT_EQ(count.value(), 0);
+    ASSERT_EQ(count, 0);
 }

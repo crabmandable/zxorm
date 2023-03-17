@@ -2,15 +2,13 @@
 #include <iterator>
 #include <memory>
 #include "zxorm/orm/statement.hpp"
-#include "zxorm/result.hpp"
 
 namespace zxorm {
     template <typename return_t>
     class RecordIterator
     {
     private:
-        using result_t = Result<return_t>;
-        using row_reader_t = std::function<result_t(Statement&)>;
+        using row_reader_t = std::function<return_t(Statement&)>;
         std::shared_ptr<Statement> _stmt;
         row_reader_t _row_reader;
     public:
@@ -22,7 +20,7 @@ namespace zxorm {
         private:
             Statement* _stmt = nullptr;
             row_reader_t _row_reader;
-            result_t _current = Error("No result");
+            return_t _current;
         public:
             using iterator_category = std::input_iterator_tag;
 
@@ -35,16 +33,14 @@ namespace zxorm {
                 if (!_stmt || _stmt->done()) {
                     return *this;
                 }
-                auto err = _stmt->step();
-                if (err) {
-                    _current = err.value();
-                } else if (!_stmt->done()) {
+                _stmt->step();
+                if (!_stmt->done()) {
                     _current = _row_reader(*_stmt);
                 }
                 return *this;
             }
 
-            result_t& operator*() {
+            return_t& operator*() {
                 return _current;
             }
             bool operator==(const iterator& other) const {
@@ -59,28 +55,17 @@ namespace zxorm {
         };
 
         iterator begin() {
-            auto err = _stmt->rewind();
-            if (err) {
-#if __cpp_exceptions
-                throw std::runtime_error(std::string("Unable to rewind statement: ") + std::string(err.value()));
-#endif
-                // this would be pretty confusing
-                return iterator();
-            }
-
+            _stmt->rewind();
             return iterator(_stmt.get(), _row_reader);
         }
         iterator end() {
             return iterator();
         }
 
-        Result<std::vector<return_t>> to_vector() {
+        std::vector<return_t> to_vector() {
             std::vector<return_t> records;
             for(auto& result: *this) {
-                if (result.is_error()) {
-                    return result.error();
-                }
-                records.emplace_back(result.value());
+                records.emplace_back(result);
             }
             return records;
         }

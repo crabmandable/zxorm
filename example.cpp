@@ -52,14 +52,7 @@ using StudentTable = Table<"students", Student,
 
 int main (void) {
     // Pass all the tables that are part of our schema to the connection object
-    auto maybe_connection = Connection<StudentTable>::create("school.db");
-
-    // most zxorm functions return a `zxorm::Result` template, that must be unwrapped
-    if (maybe_connection.is_error()) {
-        throw std::runtime_error("Unable to open school database");
-    }
-
-    auto connection = std::move(maybe_connection.value());
+    auto connection = Connection<StudentTable>::create("school.db");
 
     // now we have a connection, we can create the tables if they don't exist
     connection.create_tables();
@@ -84,7 +77,7 @@ int main (void) {
 
     // find a record by its primary key
     auto found = connection.find_record<Student>(newStudent.id);
-    if (found.is_error() || !found.has_value()) {
+    if (!found.has_value()) {
         throw std::runtime_error("Couldn't find new student");
     }
 
@@ -93,12 +86,10 @@ int main (void) {
     connection.update_record(found.value());
 
     // find a record by some other column
-    auto zach_query = connection.select_query<StudentTable>()
-        .where_one(StudentTable::field_t<"name">().like("zach"));
+    auto zach = connection.select_query<StudentTable>()
+        .where_one(StudentTable::field_t<"name">().like("zach")).exec();
 
-    auto zach = zach_query.value().exec();
-
-    if (zach.is_error() || !zach.has_value()) {
+    if (!zach.has_value()) {
         throw std::runtime_error("Couldn't find zach");
     }
 
@@ -122,32 +113,32 @@ int main (void) {
     auto students = connection.select_query<StudentTable>()
         .where_many(StudentTable::field_t<"gpa">() >= PASS_GPA &&
                     StudentTable::field_t<"year">() >= Year::Sophmore)
-        .value().exec();
+        .exec();
 
     std::cout << "Students who have a passing GPA >= "
         << std::fixed << std::setprecision(1) << PASS_GPA
         << ":\n";
 
-    for (const Result<Student>& student: students.value()) {
-        std::cout << "\t" << student.value().name << "\n";
+    for (const Student& student: students) {
+        std::cout << "\t" << student.name << "\n";
     }
 
     // simple count query
     auto n_failing = connection.select_query<CountAll, From<StudentTable>>()
-        .where_one(StudentTable::field_t<"gpa">() < PASS_GPA).value().exec();
+        .where_one(StudentTable::field_t<"gpa">() < PASS_GPA).exec();
 
     std::cout << "There are " << n_failing.value() << " failing students in all years\n";
 
     // more complicated counting using a GroupBy clause
     auto count_result = connection.select_query<
         Select<Count<Student>, StudentTable::field_t<"year">>
-    >().group_by<StudentTable::field_t<"year">>().many().value().exec();
+    >().group_by<StudentTable::field_t<"year">>().many().exec();
 
-    for (const auto& row : count_result.value()) {
+    for (const auto& row : count_result) {
         // each row will be represented by a tuple, according to the `Select` clause
         // here, the first element will be the count column,
         // and the second element will be the year
-        std::cout << "There are " << std::get<0>(row.value()) << " students "
-            "in year " << std::get<1>(row.value()) << "\n";
+        std::cout << "There are " << std::get<0>(row) << " students "
+            "in year " << std::get<1>(row) << "\n";
     }
 }

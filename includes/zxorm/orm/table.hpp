@@ -6,6 +6,7 @@
 #include "zxorm/orm/types.hpp"
 #include "zxorm/orm/column.hpp"
 #include "zxorm/orm/field.hpp"
+#include "zxorm/error.hpp"
 
 namespace zxorm {
     namespace __foreign_key_detail {
@@ -219,33 +220,27 @@ class Table {
             return str + " WHERE `" + primary_key_t::name.value + "` = ?;";
         }
 
-        static Result<T> get_row(Statement& stmt, size_t column_offset = 0)
+        static T get_row(Statement& stmt, size_t column_offset = 0)
         {
             if (stmt.column_count() - column_offset < n_columns) {
-                return Error("Unexpected number of columns returned by query,"
+                throw ConnectionError("Unexpected number of columns returned by query,"
                         " tables may not be synced");
             }
 
             T record;
             size_t column_idx = column_offset;
-            OptionalError err;
             std::apply([&]<typename... U>(const U&...) {
                 ([&]() {
-                    if (err) return;
                     if constexpr (U::public_column) {
-                        err = stmt.read_column(column_idx++, U::getter(record));
+                        stmt.read_column(column_idx++, U::getter(record));
                     } else {
                         using value_t = typename U::member_t;
                         value_t value;
-                        err = stmt.read_column(column_idx++, value);
+                        stmt.read_column(column_idx++, value);
                         U::setter(record, value);
                     }
                 }(), ...);
             }, columns_t{});
-
-            if (err) {
-                return err.value();
-            }
 
             return record;
         }

@@ -1,6 +1,5 @@
 #pragma once
 #include "zxorm/common.hpp"
-#include "zxorm/result.hpp"
 #include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/orm/query/clause.hpp"
@@ -39,7 +38,7 @@ namespace zxorm {
         // TODO: this is werid, think of a better way
         virtual void serialize_limits(std::ostream& ) {}
 
-        OptionalError prepare()
+        void prepare()
         {
             if (!_stmt) {
                 std::stringstream ss;
@@ -58,20 +57,14 @@ namespace zxorm {
 
                 ss << ";";
 
-                auto result = Statement::create(_handle, _logger, ss.str());
-                if (result.is_error()) {
-                    return result.error();
-                }
-                _stmt = std::make_shared<Statement>(std::move(result.value()));
+                _stmt = std::make_shared<Statement>(Statement::create(_handle, _logger, ss.str()));
             } else {
-                ZXORM_TRY(_stmt->reset());
+                _stmt->reset();
             }
 
             if (_where) {
-                ZXORM_TRY(_where->bind(*_stmt));
+                _where->bind(*_stmt);
             }
-
-            return std::nullopt;
         }
 
     public:

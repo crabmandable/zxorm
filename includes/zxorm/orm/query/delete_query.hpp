@@ -2,7 +2,6 @@
 #include <memory>
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
-#include "zxorm/result.hpp"
 #include "zxorm/orm/query/query.hpp"
 
 namespace zxorm {
@@ -14,16 +13,15 @@ namespace zxorm {
         PreparedDelete(std::shared_ptr<Statement> stmt) : _stmt(stmt) {}
         PreparedDelete(PreparedDelete&&) = default;
 
-        OptionalError rebind(auto&&... bindings) {
+        void rebind(auto&&... bindings) {
             _bindings = Bindings{std::forward<decltype(bindings)>(bindings)...};
 
-            ZXORM_TRY(_stmt->reset());
-            ZXORM_TRY(_stmt->bind(_bindings));
-            return std::nullopt;
+            _stmt->reset();
+            _stmt->bind(_bindings);
         }
 
-        OptionalError exec() {
-            ZXORM_TRY(_stmt->rewind());
+        void exec() {
+            _stmt->rewind();
             return _stmt->step();
         }
     };
@@ -54,15 +52,10 @@ namespace zxorm {
         DeleteQuery(DeleteQuery&& other) = default;
 
         template <typename Expression>
-        auto where(const Expression& e) -> Result<PreparedDelete<decltype(e.bindings())>> {
+        auto where(const Expression& e) -> PreparedDelete<decltype(e.bindings())> {
             Super::where(e);
-            ZXORM_TRY(Super::prepare());
+            Super::prepare();
             return PreparedDelete<decltype(e.bindings())>(Super::_stmt);
-        }
-
-        auto prepare() {
-            ZXORM_TRY(Super::prepare());
-            return PreparedDelete<>(Super::_stmt);
         }
     };
 };

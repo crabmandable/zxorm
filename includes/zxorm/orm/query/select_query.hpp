@@ -2,7 +2,6 @@
 #include <memory>
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
-#include "zxorm/result.hpp"
 #include "zxorm/orm/query/query.hpp"
 #include "zxorm/orm/query/prepared_select.hpp"
 #include "zxorm/orm/record_iterator.hpp"
@@ -87,32 +86,32 @@ namespace zxorm {
         }
 
         template <typename Expression>
-        auto where_one(const Expression& e) -> Result<PreparedSelectOne<Select, decltype(e.bindings())>>
+        auto where_one(const Expression& e) -> PreparedSelectOne<Select, decltype(e.bindings())>
         {
             Super::where(e);
             limit(1);
-            ZXORM_TRY(Super::prepare());
+            Super::prepare();
             return PreparedSelectOne<Select, decltype(e.bindings())>(Super::_stmt);
         }
 
         template <typename Expression>
-        auto where_many(const Expression& e) -> Result<PreparedSelectMany<Select, decltype(e.bindings())>>
+        auto where_many(const Expression& e) -> PreparedSelectMany<Select, decltype(e.bindings())>
         {
             Super::where(e);
-            ZXORM_TRY(Super::prepare());
+            Super::prepare();
             return PreparedSelectMany<Select, decltype(e.bindings())>(Super::_stmt);
         }
 
-        auto one() -> Result<PreparedSelectOne<Select>>
+        auto one() -> PreparedSelectOne<Select>
         {
             limit(1);
-            ZXORM_TRY(Super::prepare());
+            Super::prepare();
             return PreparedSelectOne<Select>(Super::_stmt);
         }
 
-        auto many() -> Result<PreparedSelectMany<Select>>
+        auto many() -> PreparedSelectMany<Select>
         {
-            ZXORM_TRY(Super::prepare());
+            Super::prepare();
             return PreparedSelectMany<Select>(Super::_stmt);
         }
     };

@@ -35,9 +35,7 @@ in the database it is referring to.
 
 3. Create a connection
 ```cpp
-auto result = zxorm::Connection<ObjectTable>::create("data.db");
-assert(!result.is_error());
-auto connection = std::move(result.value());
+auto connection = zxorm::Connection<ObjectTable>::create("data.db");
 ```
 The connection template accepts a list of tables, and should contain all the tables
 that your application is going to work with.
@@ -51,8 +49,8 @@ connection.insert_many_records(std::vector<Object> {
     { .some_text = "Better make sure it is saved" },
     { .some_text = "!" },
 });
-auto result = connection.find_record<Object>(4);
-assert(!result.is_error() && result.has_value());
+std::optional<Object> record = connection.find_record<Object>(4);
+assert(result.has_value());
 assert(result.value().some_text == "!");
 ```
 
@@ -92,7 +90,7 @@ auto prepared_query = connection.select_query<Object>().many();
 auto prepared_query = connection.select_query<Object>().one();
 
 // and then
-auto results = prepared_query.value().exec();
+auto results = prepared_query.exec();
 ```
 
 #### Where
@@ -129,9 +127,9 @@ Multiple items can be selected using the `Select` template.
 The results will be returned as tuples
 
 ```cpp
-zxorm::Result<std::tuple<int, Object>> result = connection.select_query<
+std::tuple<int, Object> row = connection.select_query<
     Select<ObjectTable::field_t<"id">, Object>
->().one();
+>().one().exec().value();
 ```
 
 #### Joins
@@ -144,10 +142,10 @@ auto results = connection.select_query<
     Select<User, UserData>,
     From<User>,
     Join<UserData>
->().many();
+>().many().exec();
 
 // In case you are interested, the type of `results` is:
-// zxorm::Result<zxorm::RecordIterator<std::tuple<User, UserData>>>
+// zxorm::RecordIterator<std::tuple<User, UserData>>
 ```
 If the `From` clause is omitted, then it will default to the first thing selected
 
@@ -160,7 +158,7 @@ auto results = connection.select_query<
     From<User>,
     Join<UserGroup>, // we can imagine this is a join table, joining users & groups
     Join<Group>
->().many();
+>().many().exec();
 ```
 
 The `Join` template will only work if `zxorm` knows about a foreign key that can
@@ -175,7 +173,7 @@ auto results = connection.select_query<
     From<User>,
     JoinOn<UserGroupTable::field_t<"user_id">, UserTable::field_t<"id">>,
     JoinOn<GroupTable::field_t<"id">, UserGroupTable::field_t<"group_id">>
->().many();
+>().many().exec();
 ```
 _The order of the two fields doesn't matter_
 
@@ -185,15 +183,15 @@ _The order of the two fields doesn't matter_
 The `Count` template can be used instead of a table or column to select a count
 ```cpp
 // you can specify the column to count:
-auto result = connection->select_query<Count<ObjectTable::field_t<"id">>().one();
+auto result = connection->select_query<Count<ObjectTable::field_t<"id">>().one().exec();
 
 // if unspecified, the primary key will be used
-auto result = connection->select_query<Count<ObjectTable>>().one();
+auto result = connection->select_query<Count<ObjectTable>>().one().exec();
 ```
 
 `CountAll` can be used to select `COUNT(*)` also
 ```cpp
-auto result = connection->select_query<CountAll, From<Object>>().one();
+unsigned long result = connection->select_query<CountAll, From<Object>>().one().exec().value();
 ```
 
 And of course the results can be grouped too, allowing occurrences to be counted:
@@ -201,7 +199,7 @@ And of course the results can be grouped too, allowing occurrences to be counted
 auto results = connection->select_query<
     Select<CountAll, ObjectTable::field_t<"some_text">>,
     From<Object>
->().group_by<ObjectTable::field_t<"some_text">>();
+>().group_by<ObjectTable::field_t<"some_text">>().many().exec();
 ```
 ___
 ### Delete queries
@@ -213,7 +211,7 @@ It behaves similarly to the `select_query` interface.
 auto query = connection->delete_query<Object>()
     .where(ObjectTable::field_t<"some_text">().like("hello %"));
 
-query.value().exec();
+query.exec();
 ```
 
 Using joins in a delete query is not supported, since it is not part of the SQL

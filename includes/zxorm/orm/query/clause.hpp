@@ -1,6 +1,5 @@
 #pragma once
 #include "zxorm/common.hpp"
-#include "zxorm/result.hpp"
 #include "zxorm/orm/statement.hpp"
 
 namespace zxorm {
@@ -9,7 +8,7 @@ namespace zxorm {
         std::string clause;
         BindingClauseBase(std::string clause) : clause{clause} {}
         virtual ~BindingClauseBase() = default;
-        virtual OptionalError bind(Statement& s) = 0;
+        virtual void bind(Statement& s) = 0;
     };
 
     template <typename Bindings = std::tuple<>>
@@ -18,8 +17,8 @@ namespace zxorm {
 
         BindingClause(std::string clause, Bindings bindings) : BindingClauseBase{clause}, bindings{bindings} {}
 
-        OptionalError bind(Statement& s) {
-            return s.bind(bindings);
+        void bind(Statement& s) {
+            s.bind(bindings);
         }
     };
 
@@ -34,7 +33,7 @@ namespace zxorm {
         using table = Table;
         static constexpr bool is_optional = _is_optional;
 
-        using result_t = OptionalResult<typename table::object_class>;
+        using result_t = typename table::object_class;
 
         using return_t = std::conditional_t<_is_optional,
           std::optional<typename table::object_class>,
@@ -64,7 +63,7 @@ namespace zxorm {
         using column_t = typename Field<Table, field_name>::column_t;
         static constexpr bool is_optional = _is_optional;
         using field_type_t = typename column_t::member_t;
-        using result_t = OptionalResult<field_type_t>;
+        using result_t = field_type_t;
 
         using return_t = std::conditional_t<_is_optional,
           std::optional<field_type_t>,
@@ -84,11 +83,10 @@ namespace zxorm {
             }
         }
 
-        static Result<return_t> get_row(Statement& stmt, size_t column_offset = 0)
+        static return_t get_row(Statement& stmt, size_t column_offset = 0)
         {
             return_t col;
-            auto err = stmt.read_column(column_offset, col);
-            if (err) return err.value();
+            stmt.read_column(column_offset, col);
             return col;
         }
 
@@ -102,7 +100,7 @@ namespace zxorm {
     struct __count {
         static constexpr bool is_optional = false;
         using return_t = unsigned long;
-        using result_t = OptionalResult<return_t>;
+        using result_t = return_t;
         using table = typename Field::table_t;
 
         // counts are never null
@@ -110,11 +108,10 @@ namespace zxorm {
 
         static constexpr size_t n_columns = 1;
 
-        static Result<return_t> get_row(Statement& stmt, size_t column_offset = 0)
+        static return_t get_row(Statement& stmt, size_t column_offset = 0)
         {
             return_t count;
-            auto err = stmt.read_column(column_offset, count);
-            if (err) return err.value();
+            stmt.read_column(column_offset, count);
             return count;
         }
 
@@ -132,7 +129,7 @@ namespace zxorm {
     struct __count_all {
         static constexpr bool is_optional = false;
         using return_t = unsigned long;
-        using result_t = OptionalResult<return_t>;
+        using result_t = return_t;
         using table = From;
 
         // counts are never null
@@ -140,11 +137,10 @@ namespace zxorm {
 
         static constexpr size_t n_columns = 1;
 
-        static Result<return_t> get_row(Statement& stmt, size_t column_offset = 0)
+        static return_t get_row(Statement& stmt, size_t column_offset = 0)
         {
             return_t count;
-            auto err = stmt.read_column(column_offset, count);
-            if (err) return err.value();
+            stmt.read_column(column_offset, count);
             return count;
         }
 
@@ -184,7 +180,7 @@ namespace zxorm {
         };
 
         using return_t = typename _selection_return<Selections...>::type;
-        using result_t = std::tuple<typename Selections::result_t...>;
+        using result_t = std::tuple<std::optional<typename Selections::result_t>...>;
 
         friend std::ostream & operator<< (std::ostream &out, const __select_impl<From, Selections...>&) {
             out << "SELECT ";
