@@ -21,6 +21,12 @@ namespace zxorm {
         BaseQuery& operator=(const BaseQuery& old) = delete;
     };
 
+    class BasePreparedQuery : public BaseQuery {
+    public:
+        BasePreparedQuery() = default;
+        BasePreparedQuery(BasePreparedQuery&& old) = default;
+    };
+
     template <typename SelectablesTuple, typename Table, typename ColumnClause, typename JoinsTuple=std::tuple<>>
     class Query : public BaseQuery {
     protected:

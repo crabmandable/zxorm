@@ -93,9 +93,10 @@ int main (void) {
     connection.update_record(found.value());
 
     // find a record by some other column
-    auto zach = connection.select_query<StudentTable>()
-        .where(StudentTable::field_t<"name">().like("zach"))
-        .one();
+    auto zach_query = connection.select_query<StudentTable>()
+        .where_one(StudentTable::field_t<"name">().like("zach"));
+
+    auto zach = zach_query.value().exec();
 
     if (zach.is_error() || !zach.has_value()) {
         throw std::runtime_error("Couldn't find zach");
@@ -119,9 +120,9 @@ int main (void) {
 
     // find many records with a more complicated WHERE clause
     auto students = connection.select_query<StudentTable>()
-        .where(StudentTable::field_t<"gpa">() >= PASS_GPA &&
-               StudentTable::field_t<"year">() >= Year::Sophmore)
-        .many();
+        .where_many(StudentTable::field_t<"gpa">() >= PASS_GPA &&
+                    StudentTable::field_t<"year">() >= Year::Sophmore)
+        .value().exec();
 
     std::cout << "Students who have a passing GPA >= "
         << std::fixed << std::setprecision(1) << PASS_GPA
@@ -133,16 +134,14 @@ int main (void) {
 
     // simple count query
     auto n_failing = connection.select_query<CountAll, From<StudentTable>>()
-        .where(StudentTable::field_t<"gpa">() < PASS_GPA)
-        .one();
+        .where_one(StudentTable::field_t<"gpa">() < PASS_GPA).value().exec();
 
     std::cout << "There are " << n_failing.value() << " failing students in all years\n";
-
 
     // more complicated counting using a GroupBy clause
     auto count_result = connection.select_query<
         Select<Count<Student>, StudentTable::field_t<"year">>
-    >().group_by<StudentTable::field_t<"year">>().many();
+    >().group_by<StudentTable::field_t<"year">>().many().value().exec();
 
     for (const auto& row : count_result.value()) {
         // each row will be represented by a tuple, according to the `Select` clause

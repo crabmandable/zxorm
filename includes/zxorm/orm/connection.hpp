@@ -42,7 +42,7 @@ namespace zxorm {
             std::string_view, // table name
             std::unordered_map<
                 QueryCacheType,
-                std::shared_ptr<BaseQuery>
+                std::shared_ptr<BasePreparedQuery>
             >
         > _query_cache;
 
@@ -817,7 +817,6 @@ namespace zxorm {
     OptionalResult<T> Connection<Table...>::find_record(const PrimaryKeyType& id)
     {
         using table_t = table_for_class_t<T>;
-        using query_t = decltype(make_select_query<T>());
         static_assert(table_t::has_primary_key, "Cannot execute a find on a table without a primary key");
 
         using primary_key_t = typename table_t::primary_key_t;
@@ -828,12 +827,17 @@ namespace zxorm {
         const char* table_name = table_t::name.value;
         auto& cache_item = _query_cache[table_name][QueryCacheType::find_record];
 
+        auto e = Field<table_t, primary_key_t::name>() == id;
+        using query_t = std::remove_reference_t<decltype(make_select_query<T>().where_one(e).value())>;
+
         if (!cache_item) {
-            cache_item = std::make_shared<query_t>(std::move(make_select_query<T>()));
+            ZXORM_GET_RESULT(auto query, make_select_query<T>().where_one(e));
+            cache_item = std::make_shared<query_t>(std::move(query));
+        } else {
+            ZXORM_TRY(std::static_pointer_cast<query_t>(cache_item)->rebind(id));
         }
 
-        auto e = Field<table_t, primary_key_t::name>() == id;
-        return std::static_pointer_cast<query_t>(cache_item)->where(e).one();
+        return std::static_pointer_cast<query_t>(cache_item)->exec();
     }
 
     template <class... Table>
@@ -841,7 +845,6 @@ namespace zxorm {
     OptionalError Connection<Table...>::delete_record(const PrimaryKeyType& id)
     {
         using table_t = table_for_class_t<T>;
-        using query_t = decltype(make_delete_query<T>());
 
         static_assert(table_t::has_primary_key, "Cannot execute a delete on a table without a primary key");
 
@@ -853,12 +856,17 @@ namespace zxorm {
         const char* table_name = table_t::name.value;
         auto& cache_item = _query_cache[table_name][QueryCacheType::delete_record];
 
+        auto e = Field<table_t, primary_key_t::name>() == id;
+        using query_t = std::remove_reference_t<decltype(make_delete_query<T>().where(e).value())>;
+
         if (!cache_item) {
-            cache_item = std::make_shared<query_t>(std::move(make_delete_query<T>()));
+            ZXORM_GET_RESULT(auto query, make_delete_query<T>().where(e));
+            cache_item = std::make_shared<query_t>(std::move(query));
+        } else {
+            ZXORM_TRY(std::static_pointer_cast<query_t>(cache_item)->rebind(id));
         }
 
-        auto e = Field<table_t, primary_key_t::name>() == id;
-        return std::static_pointer_cast<query_t>(cache_item)->where(e).exec();
+        return std::static_pointer_cast<query_t>(cache_item)->exec();
     }
 
     template <class... Table>
@@ -880,15 +888,19 @@ namespace zxorm {
     auto Connection<Table...>::first()
     {
         using table_t = table_for_class_t<T>;
-        using query_t = decltype(make_select_query<T>());
+        using query_t = std::remove_reference_t<decltype(make_select_query<T>().one().value())>;
 
         auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::first];
 
         if (!cache_item) {
-            cache_item = std::make_shared<query_t>(std::move(make_select_query<T>()));
+            auto query = make_select_query<T>().one();
+            if (query.is_error()) {
+                return OptionalResult<typename table_t::object_class>(query.error());
+            }
+            cache_item = std::make_shared<query_t>(std::move(query.value()));
         }
 
-        return std::static_pointer_cast<query_t>(cache_item)->one();
+        return std::static_pointer_cast<query_t>(cache_item)->exec();
     }
 
     template <class... Table>
@@ -896,17 +908,20 @@ namespace zxorm {
     auto Connection<Table...>::last()
     {
         using table_t = table_for_class_t<T>;
-        using query_t = decltype(make_select_query<T>());
+        using query_t = std::remove_reference_t<decltype(make_select_query<T>().one().value())>;
         using pk_field = Field<table_t, table_t::primary_key_t::name>;
 
         auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::last];
 
         if (!cache_item) {
-            cache_item = std::make_shared<query_t>(std::move(make_select_query<T>()));
-            std::static_pointer_cast<query_t>(cache_item)->template order_by<pk_field>(order_t::DESC);
+            auto query = make_select_query<T>().template order_by<pk_field>(order_t::DESC).one();
+            if (query.is_error()) {
+                return OptionalResult<typename table_t::object_class>(query.error());
+            }
+            cache_item = std::make_shared<query_t>(std::move(query.value()));
         }
 
-        return std::static_pointer_cast<query_t>(cache_item)->one();
+        return std::static_pointer_cast<query_t>(cache_item)->exec();
     }
 
     template <class... Table>

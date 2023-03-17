@@ -82,23 +82,28 @@ ___
 
 For more complicated queries, the connection class has the `select_query`.
 
-This function returns a query object that can be executed (using `many` or `one`)
+This function returns a query builder that can be prepared, and then executed
 to obtain results.
 
 e.g.
 ```cpp
-auto results = connection.select_query<Object>().many();
+auto prepared_query = connection.select_query<Object>().many();
 // or
-auto result = connection.select_query<Object>().one();
+auto prepared_query = connection.select_query<Object>().one();
+
+// and then
+auto results = prepared_query.value().exec();
 ```
 
 #### Where
 
-A `where` clause can also be added like so:
+A `WHERE` clause can also be added like so:
 ```cpp
-auto results = connection.select_query<Object>()
-    .where(ObjectTable::field_t<"some_text">().like("hello %"))
-    .many();
+auto query = connection.select_query<Object>()
+    .where_many(ObjectTable::field_t<"some_text">().like("hello %"));
+// or
+auto query = connection.select_query<Object>()
+    .where_one(ObjectTable::field_t<"some_text">().like("hello %"));
 ```
 In order to reference specific fields on the table, the `Table` template must be
 used (here `ObjectTable` is the alias from the example at the top of the README).
@@ -180,20 +185,20 @@ _The order of the two fields doesn't matter_
 The `Count` template can be used instead of a table or column to select a count
 ```cpp
 // you can specify the column to count:
-auto result = my_conn->select_query<Count<ObjectTable::field_t<"id">>().one();
+auto result = connection->select_query<Count<ObjectTable::field_t<"id">>().one();
 
 // if unspecified, the primary key will be used
-auto result = my_conn->select_query<Count<ObjectTable>>().one();
+auto result = connection->select_query<Count<ObjectTable>>().one();
 ```
 
 `CountAll` can be used to select `COUNT(*)` also
 ```cpp
-auto result = my_conn->select_query<CountAll, From<Object>>().one();
+auto result = connection->select_query<CountAll, From<Object>>().one();
 ```
 
 And of course the results can be grouped too, allowing occurrences to be counted:
 ```cpp
-auto results = my_conn->select_query<
+auto results = connection->select_query<
     Select<CountAll, ObjectTable::field_t<"some_text">>,
     From<Object>
 >().group_by<ObjectTable::field_t<"some_text">>();
@@ -201,14 +206,14 @@ auto results = my_conn->select_query<
 ___
 ### Delete queries
 
-The connection has a `delete_query` function that can be used to construct and
-execute deletions. It behaves similarly to the `select_query` interface, although
-it is much simpler.
+The connection has a `delete_query` function that can be used to deletions.
+It behaves similarly to the `select_query` interface.
 
 ```cpp
-auto err = my_conn->delete_query<Object>()
-    .where(ObjectTable::field_t<"some_text">().like("hello %")
-    .exec();
+auto query = connection->delete_query<Object>()
+    .where(ObjectTable::field_t<"some_text">().like("hello %"));
+
+query.value().exec();
 ```
 
 Using joins in a delete query is not supported, since it is not part of the SQL
@@ -224,10 +229,27 @@ This is possible since the shape of these queries, and the number of binds
 never changes. For more open ended queries, caching and reuse is possible,
 but it is up to **you** to implement.
 
-It is very important to note that when reusing queries, it is not possible to
-change the text of a query that was already executed, it can only be bound with
-different parameters. If a query is reused with a different where clause,
-then undefined behaviour may occur.
+Once the query has been prepared, `exec` can be called on it to execute it with
+the same bindings that were used previously
+```cpp
+auto query = connection->select_query<Object>()
+                .order_by<ObjectTable::field_t<"some_text">()
+                .where_many(ObjectTable::field_t<"some_text">().like("x%"));
+
+auto results = query.exec();
+// some time later...
+auto more_results = query.exec();
+```
+Or the `rebind` function can be used to change the bound arguments for the
+WHERE clause
+```cpp
+query.rebind("y%");
+auto results_for_y = query.exec();
+```
+
+It is important to note that when reusing queries, it is not possible to
+change the text of a query that was already prepared, it can only be bound with
+different parameters.
 ___
 
 ### Multithreading

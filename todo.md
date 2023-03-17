@@ -1,17 +1,14 @@
 Note to self: start from top
 
-* Split preparation & execution into two steps so that reuse makes more sense
+* Experiment with exceptions
 
-* Docs
-    * Reuse of query in readme
-
-* Transaction tests
+* Naming - Change queries to query builders, and prepared queries to queries
 
 * Reorganize code - need to split `clause` up, and try to clean up `connection`
 
-* Experiment with exceptions
+* Docs
 
-* Statement caching
+* Transaction tests
 
 * REGEXP
 
