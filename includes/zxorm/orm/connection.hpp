@@ -85,7 +85,7 @@ namespace zxorm {
         // so the public inserts call this implementation
         template<class T>
             void insert_record_impl (
-                    std::conditional_t<table_has_rowid<T>(), T&, const T&> record);
+                    std::conditional_t<not std::is_const_v<T> && table_has_rowid<T>(), T&, const T&> record);
 
     public:
 
@@ -121,7 +121,7 @@ namespace zxorm {
 
         template<class T>
             void insert_record (const T& record)
-            { return insert_record_impl<T>(record); }
+            { return insert_record_impl<const T>(record); }
 
         // when the table has a rowid column
         // we set the id after insertion
@@ -230,8 +230,11 @@ namespace zxorm {
     template<class C>
     struct Connection<Table...>::table_for_class
     {
-        static_assert(index_of_table<C>::value >= 0, "Connection does not contain any table matching the type T");
-        using type = typename std::tuple_element<index_of_table<C>::value, std::tuple<Table...>>::type;
+    private:
+        using plain_c = std::remove_cvref_t<C>;
+    public:
+        static_assert(index_of_table<plain_c>::value >= 0, "Connection does not contain any table matching the type T");
+        using type = typename std::tuple_element<index_of_table<plain_c>::value, std::tuple<Table...>>::type;
     };
 
     template <class... Table>
@@ -680,7 +683,7 @@ namespace zxorm {
     template <class... Table>
     template<class T>
     void Connection<Table...>::insert_record_impl (
-        std::conditional_t<table_has_rowid<T>(), T&, const T&> record)
+        std::conditional_t<not std::is_const_v<T> && table_has_rowid<T>(), T&, const T&> record)
     {
         using table_t = table_for_class_t<T>;
 
@@ -712,7 +715,7 @@ namespace zxorm {
             throw InternalError("Insert query didn't run to completion");
         }
 
-        if constexpr (table_has_rowid<T>()) {
+        if constexpr (not std::is_const_v<T> && table_has_rowid<T>()) {
             int64_t value = sqlite3_last_insert_rowid(_db_handle.get());
             table_t::primary_key_t::setter(record, value);
         }
