@@ -7,8 +7,8 @@
 #include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/orm/expression.hpp"
 #include "zxorm/orm/field.hpp"
-#include "zxorm/orm/query/select_query.hpp"
-#include "zxorm/orm/query/delete_query.hpp"
+#include "zxorm/orm/query/builder/select_query_builder.hpp"
+#include "zxorm/orm/query/builder/delete_query_builder.hpp"
 #include <functional>
 #include <sstream>
 #include <memory>
@@ -73,7 +73,7 @@ namespace zxorm {
         struct selections_are_selectable;
 
         template<class SelectOrTable, typename From=void, class... Clauses>
-        auto make_select_query();
+        auto make_select_query_builder();
 
         template<class From>
         auto make_delete_query();
@@ -451,7 +451,7 @@ namespace zxorm {
 
     template <class... Table>
     template<typename SelectOrTable, typename From, typename... Clauses>
-    auto Connection<Table...>::make_select_query()
+    auto Connection<Table...>::make_select_query_builder()
     {
         // The first template argument should be a `Select` template,
         // or a table (or equivalent),
@@ -524,7 +524,7 @@ namespace zxorm {
             // we make every column optional, figuring out specifically which columns are optional
             // is too complicated
             static constexpr bool results_are_optional = query_is_nested && a_selection_is_optional<selectables_t>::value;
-            return SelectQuery<
+            return SelectQueryBuilder<
                 selectables_t,
                 typename select_type<results_are_optional, selectables_t, from_t, SelectOrTable>::type,
                 joins_tuple>
@@ -540,7 +540,7 @@ namespace zxorm {
             // only the `from_t` is selectable since there are no joins
             using selectables_t = std::tuple<__selectable_table<false, table_for_class_t<from_t>::name>>;
 
-            return SelectQuery<selectables_t, typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type> (
+            return SelectQueryBuilder<selectables_t, typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type> (
                 _db_handle.get(),
                 _logger
             );
@@ -551,7 +551,7 @@ namespace zxorm {
     template<class From>
     auto Connection<Table...>::make_delete_query()
     {
-        return DeleteQuery<table_for_class_t<From>>(
+        return DeleteQueryBuilder<table_for_class_t<From>>(
             _db_handle.get(),
             _logger
         );
@@ -759,10 +759,10 @@ namespace zxorm {
         auto& cache_item = _query_cache[table_name][QueryCacheType::find_record];
 
         auto e = Field<table_t, primary_key_t::name>() == id;
-        using query_t = decltype(make_select_query<T>().where_one(e));
+        using query_t = decltype(make_select_query_builder<T>().where_one(e));
 
         if (!cache_item) {
-            auto query = make_select_query<T>().where_one(e);
+            auto query = make_select_query_builder<T>().where_one(e);
             cache_item = std::make_shared<query_t>(std::move(query));
         } else {
             std::static_pointer_cast<query_t>(cache_item)->rebind(id);
@@ -811,7 +811,7 @@ namespace zxorm {
     template<typename Select, typename From, typename... Clauses>
     auto Connection<Table...>::select_query()
     {
-        return make_select_query<Select, From, Clauses...>();
+        return make_select_query_builder<Select, From, Clauses...>();
     }
 
     template <class... Table>
@@ -819,12 +819,12 @@ namespace zxorm {
     auto Connection<Table...>::first()
     {
         using table_t = table_for_class_t<T>;
-        using query_t = decltype(make_select_query<T>().one());
+        using query_t = decltype(make_select_query_builder<T>().one());
 
         auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::first];
 
         if (!cache_item) {
-            auto query = make_select_query<T>().one();
+            auto query = make_select_query_builder<T>().one();
             cache_item = std::make_shared<query_t>(std::move(query));
         }
 
@@ -836,13 +836,13 @@ namespace zxorm {
     auto Connection<Table...>::last()
     {
         using table_t = table_for_class_t<T>;
-        using query_t = decltype(make_select_query<T>().one());
+        using query_t = decltype(make_select_query_builder<T>().one());
         using pk_field = Field<table_t, table_t::primary_key_t::name>;
 
         auto& cache_item = _query_cache[table_t::name.value][QueryCacheType::last];
 
         if (!cache_item) {
-            auto query = make_select_query<T>().template order_by<pk_field>(order_t::DESC).one();
+            auto query = make_select_query_builder<T>().template order_by<pk_field>(order_t::DESC).one();
             cache_item = std::make_shared<query_t>(std::move(query));
         }
 

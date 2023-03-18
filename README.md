@@ -98,10 +98,10 @@ auto results = prepared_query.exec();
 
 A `WHERE` clause can also be added like so:
 ```cpp
-auto query = connection.select_query<Object>()
+auto prepared_query = connection.select_query<Object>()
     .where_many(ObjectTable::field_t<"some_text">().like("hello %"));
 // or
-auto query = connection.select_query<Object>()
+auto prepared_query = connection.select_query<Object>()
     .where_one(ObjectTable::field_t<"some_text">().like("hello %"));
 ```
 In order to reference specific fields on the table, the `Table` template must be

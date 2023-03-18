@@ -1,15 +1,16 @@
 #pragma once
 
-
 #include <memory>
 #include <optional>
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
-#include "zxorm/orm/query/query.hpp"
+#include "zxorm/orm/query/prepared_query/base_prepared_query.hpp"
+#include "zxorm/orm/statement.hpp"
 #include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/orm/table.hpp"
 
 namespace zxorm {
+
     template <class Select, class Bindings = std::tuple<>>
     class BasePreparedSelect: public BasePreparedQuery {
     public:

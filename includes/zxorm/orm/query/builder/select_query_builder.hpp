@@ -2,16 +2,16 @@
 #include <memory>
 #include <sqlite3.h>
 #include "zxorm/common.hpp"
-#include "zxorm/orm/query/query.hpp"
-#include "zxorm/orm/query/prepared_select.hpp"
+#include "zxorm/orm/query/builder/base_query_builder.hpp"
+#include "zxorm/orm/query/prepared_query/prepared_select_query.hpp"
 #include "zxorm/orm/record_iterator.hpp"
 #include "zxorm/orm/table.hpp"
 
 namespace zxorm {
     template <typename SelectablesTuple, typename Select, typename JoinsTuple=std::tuple<>>
-    class SelectQuery : public Query<SelectablesTuple, typename Select::from_t, Select, JoinsTuple> {
+    class SelectQueryBuilder : public BaseQueryBuilder<SelectablesTuple, typename Select::from_t, Select, JoinsTuple> {
     private:
-        using Super = Query<SelectablesTuple, typename Select::from_t, Select, JoinsTuple>;
+        using Super = BaseQueryBuilder<SelectablesTuple, typename Select::from_t, Select, JoinsTuple>;
 
         std::string _limit_clause;
         std::string _order_clause;
@@ -22,10 +22,10 @@ namespace zxorm {
         }
 
     public:
-        SelectQuery(sqlite3* handle, Logger logger) :
+        SelectQueryBuilder(sqlite3* handle, Logger logger) :
             Super(handle, logger) {}
 
-        SelectQuery(SelectQuery&& other) = default;
+        SelectQueryBuilder(SelectQueryBuilder&& other) = default;
 
         auto& limit(unsigned long limit, unsigned long offset = 0) {
             if (_limit_clause.empty()) {

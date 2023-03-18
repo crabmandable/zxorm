@@ -6,28 +6,8 @@
 #include <sqlite3.h>
 
 namespace zxorm {
-    class BaseQuery {
-    public:
-        ~BaseQuery() = default;
-
-    protected:
-        BaseQuery() = default;
-
-        BaseQuery(BaseQuery&& old) = default;
-        BaseQuery& operator=(BaseQuery&& old) = default;
-
-        BaseQuery(const BaseQuery& old) = delete;
-        BaseQuery& operator=(const BaseQuery& old) = delete;
-    };
-
-    class BasePreparedQuery : public BaseQuery {
-    public:
-        BasePreparedQuery() = default;
-        BasePreparedQuery(BasePreparedQuery&& old) = default;
-    };
-
     template <typename SelectablesTuple, typename Table, typename ColumnClause, typename JoinsTuple=std::tuple<>>
-    class Query : public BaseQuery {
+    class BaseQueryBuilder {
     protected:
         const char* _table_name = Table::name.value;
         sqlite3* _handle;
@@ -67,11 +47,6 @@ namespace zxorm {
             }
         }
 
-    public:
-        Query(sqlite3* handle, Logger logger) : _handle(handle), _logger(logger) { }
-        Query(Query&&other) = default;
-        virtual ~Query() = default;
-
         template <typename Expression>
         void where(const Expression& e) {
 
@@ -80,6 +55,17 @@ namespace zxorm {
 
             _where = std::make_shared<Where<decltype(e.bindings())>>(e);
         }
+
+        BaseQueryBuilder(sqlite3* handle, Logger logger) : _handle(handle), _logger(logger) { }
+
+        BaseQueryBuilder(BaseQueryBuilder&& old) = default;
+        BaseQueryBuilder& operator=(BaseQueryBuilder&& old) = default;
+
+        BaseQueryBuilder(const BaseQueryBuilder& old) = delete;
+        BaseQueryBuilder& operator=(const BaseQueryBuilder& old) = delete;
+
+    public:
+        virtual ~BaseQueryBuilder() = default;
     };
 };
 
