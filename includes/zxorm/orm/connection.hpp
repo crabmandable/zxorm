@@ -49,8 +49,6 @@ namespace zxorm {
         std::unordered_map<std::string_view /* table name */, std::shared_ptr<Statement>> _insert_statement_cache;
         std::unordered_map<std::string_view /* table name */, std::shared_ptr<Statement>> _update_statement_cache;
 
-        Connection(sqlite3* db_handle, Logger logger);
-
         template<class C> struct index_of_table;
         template<FixedLengthString name> struct index_of_table_name;
 
@@ -73,8 +71,6 @@ namespace zxorm {
 
         template <typename selectables_tuple, typename T>
         struct selections_are_selectable;
-
-        void log_error(const Error& err);
 
         template<class SelectOrTable, typename From=void, class... Clauses>
         auto make_select_query();
@@ -104,8 +100,11 @@ namespace zxorm {
         using table_for_name_t = typename table_for_name<name>::type;
 
 
-        static Connection<Table...> create(
-                const char* file_name, int flags = 0, const char* z_vfs = nullptr, Logger logger = nullptr);
+        Connection(
+            const char* file_name,
+            int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+            const char* z_vfs = nullptr,
+            Logger logger = nullptr);
 
         Connection(Connection&& old) = default;
         Connection& operator =(Connection&&) = default;
@@ -169,7 +168,7 @@ namespace zxorm {
     };
 
     template <class... Table>
-    Connection<Table...> Connection<Table...>::create(
+    Connection<Table...>::Connection(
             const char* file_name,
             int flags,
             const char* z_vfs,
@@ -180,29 +179,24 @@ namespace zxorm {
         }
 
         if (logger) {
-            std::ostringstream oss;
-            oss << "Opening sqlite connection with flags: " << flags;
-            logger(log_level::Debug, oss.str().c_str());
+            _logger = logger;
         }
+        else {
+            _logger = [](auto...) {};
+        }
+
+
+        std::ostringstream oss;
+        oss << "Opening sqlite connection with flags: " << flags;
+        _logger(log_level::Debug, oss.str().c_str());
 
         sqlite3* db_handle = nullptr;
         int result = sqlite3_open_v2(file_name, &db_handle, flags, z_vfs);
         if (result != SQLITE_OK || !db_handle) {
             auto err = ConnectionError("Unable to open sqlite connection", db_handle);
-            if (logger) {
-                logger(log_level::Error, err);
-            }
+            _logger(log_level::Error, err);
             throw err;
         }
-
-        return Connection({db_handle}, logger);
-    }
-
-    template <class... Table>
-    Connection<Table...>::Connection(sqlite3* db_handle, Logger logger)
-    {
-        if (logger) _logger = logger;
-        else _logger = [](auto...) {};
 
         _db_handle = {db_handle, [logger](sqlite3* handle) {
             int result = sqlite3_close_v2(handle);
@@ -566,7 +560,7 @@ namespace zxorm {
     template <class... Table>
     auto Connection<Table...>::make_statement(const std::string& query)
     {
-        return Statement::create(_db_handle.get(), _logger, query);
+        return Statement(_db_handle.get(), _logger, query);
     }
 
     template <class... Table>
@@ -574,12 +568,6 @@ namespace zxorm {
     {
         auto stmt = make_statement(query);
         stmt.step();
-    }
-
-    template <class... Table>
-    void Connection<Table...>::log_error(const Error& err)
-    {
-        _logger(log_level::Error, err);
     }
 
     template <class... Table>
@@ -607,7 +595,7 @@ namespace zxorm {
 
         if constexpr (table_has_rowid<T>()) {
             if (!pk) {
-                throw Error("Cannot update record with unknown rowid");
+                throw InternalError("Cannot update record with unknown rowid");
             }
         }
 
@@ -634,7 +622,7 @@ namespace zxorm {
         stmt->step();
 
         if (!stmt->done()) [[unlikely]] {
-            throw Error("Update query didn't run to completion");
+            throw InternalError("Update query didn't run to completion");
         }
     }
 
@@ -681,7 +669,7 @@ namespace zxorm {
                 insert_stmt.value().step();
 
                 if (!insert_stmt.value().done()) [[unlikely]] {
-                    throw Error("Insert query didn't run to completion");
+                    throw InternalError("Insert query didn't run to completion");
                 }
 
                 inserted += batch_size;
@@ -721,7 +709,7 @@ namespace zxorm {
         stmt->step();
 
         if (!stmt->done()) [[unlikely]] {
-            throw Error("Insert query didn't run to completion");
+            throw InternalError("Insert query didn't run to completion");
         }
 
         if constexpr (table_has_rowid<T>()) {

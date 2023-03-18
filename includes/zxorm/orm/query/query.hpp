@@ -57,7 +57,7 @@ namespace zxorm {
 
                 ss << ";";
 
-                _stmt = std::make_shared<Statement>(Statement::create(_handle, _logger, ss.str()));
+                _stmt = std::make_shared<Statement>(_handle, _logger, ss.str());
             } else {
                 _stmt->reset();
             }

@@ -60,7 +60,7 @@ class TableCreationTest : public ::testing::Test {
 template<typename... T>
 auto make_connection() -> std::shared_ptr<Connection<T...>> {
     using connection_t = Connection<T...>;
-    return std::make_shared<connection_t>(std::move(connection_t::create("test.db", 0, 0, &logger)));
+    return std::make_shared<connection_t>("test.db", 0, nullptr, &logger);
 }
 
 TEST_F(TableCreationTest, CreateTables) {
@@ -93,7 +93,7 @@ TEST_F(TableCreationTest, CreateManyTables) {
 
 TEST_F(TableCreationTest, AllOrNothingTransaction) {
     auto my_conn = make_connection<table_one_t, table_one_t, table_three_t>();
-    EXPECT_THROW(my_conn->create_tables(false), SQLiteError);
+    EXPECT_THROW(my_conn->create_tables(false), SQLExecutionError);
 
     auto count = my_conn->count_tables();
     ASSERT_EQ(count, 0);

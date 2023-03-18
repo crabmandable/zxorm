@@ -52,7 +52,7 @@ using StudentTable = Table<"students", Student,
 
 int main (void) {
     // Pass all the tables that are part of our schema to the connection object
-    auto connection = Connection<StudentTable>::create("school.db");
+    auto connection = Connection<StudentTable>("school.db");
 
     // now we have a connection, we can create the tables if they don't exist
     connection.create_tables();

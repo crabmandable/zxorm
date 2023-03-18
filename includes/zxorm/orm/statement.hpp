@@ -26,11 +26,24 @@ namespace zxorm {
         size_t _step_count = 0;
         bool _done = false;
 
-        Statement(sqlite3* handle, Logger logger, sqlite3_stmt* stmt) : _handle{handle}, _logger{logger} {
+        public:
+        Statement(sqlite3* handle, Logger logger, const std::string& query) : _handle{handle}, _logger{logger}
+        {
+            _logger(log_level::Debug, "Initializing statement");
+            _logger(log_level::Debug, query.c_str());
+
+            sqlite3_stmt* stmt = nullptr;
+            int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
+            if (result != SQLITE_OK || !stmt) {
+                auto err = InternalError("Unable to initialize statement", handle);
+                _logger(log_level::Error, err);
+                throw err;
+            }
+
             _stmt = {stmt, [logger, handle](sqlite3_stmt* s) {
                 int result = sqlite3_finalize(s);
                 if (result != SQLITE_OK) {
-                    auto err = SQLiteError("Unable to finalize statement", handle);
+                    auto err = InternalError("Statement error", handle);
                     logger(log_level::Error, err);
                 }
             }};
@@ -39,23 +52,6 @@ namespace zxorm {
             for (size_t i = 1; i == _parameter_count; i++) {
                 _is_bound[i] = false;
             }
-        }
-
-        public:
-        [[nodiscard]] static Statement create(sqlite3* handle, Logger logger, const std::string& query)
-        {
-            logger(log_level::Debug, "Initializing statement");
-            logger(log_level::Debug, query.c_str());
-
-            sqlite3_stmt* stmt = nullptr;
-            int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
-            if (result != SQLITE_OK || !stmt) {
-                auto err = SQLiteError("Unable to initialize statement", handle);
-                logger(log_level::Error, err);
-                throw err;
-            }
-
-            return Statement(handle, logger, stmt);
         }
 
         void bind(auto tuple)
@@ -107,7 +103,7 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                throw SQLiteError("Unable to bind parameter to statment", _handle);
+                throw InternalError("Unable to bind parameter to statment", _handle);
             }
             _is_bound[idx] = true;
         }
@@ -137,7 +133,7 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                throw SQLiteError("Unable to bind parameter to statment", _handle);
+                throw InternalError("Unable to bind parameter to statment", _handle);
             }
 
             _is_bound[idx] = true;
@@ -146,7 +142,7 @@ namespace zxorm {
         void rewind() {
             int result = sqlite3_reset(_stmt.get());
             if (result != SQLITE_OK) {
-                throw SQLiteError( "Unable to reset statment", _handle);
+                throw InternalError( "Unable to reset statment", _handle);
             }
             _done = false;
             _step_count = 0;
@@ -157,24 +153,24 @@ namespace zxorm {
 
             int result = sqlite3_clear_bindings(_stmt.get());
             if (result != SQLITE_OK) {
-                throw SQLiteError( "Unable to clear bindings", _handle);
+                throw InternalError( "Unable to clear bindings", _handle);
             }
             for (auto& [_, v] : _is_bound) v = false;
         }
 
         void step() {
             if (_done) {
-                throw Error("Query has run to completion");
+                throw InternalError("Query has run to completion");
             }
             if (std::any_of(_is_bound.cbegin(), _is_bound.cend(),
                         [](const auto& bound) { return !bound.second; } )) {
-                throw Error("Some parameters have not been bound");
+                throw InternalError("Some parameters have not been bound");
             }
 
             int result = sqlite3_step(_stmt.get());
             _step_count++;
             if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
-                throw SQLiteError("Unable to execute statment", _handle);
+                throw SQLExecutionError("Unable to execute statment", _handle);
             }
 
             _done = result == SQLITE_DONE;
@@ -189,14 +185,14 @@ namespace zxorm {
             switch(data_type) {
                 case SQLITE_INTEGER:
                 case SQLITE_FLOAT: {
-                    throw Error("Tried to read an arithmetic column into a container");
+                    throw InternalError("Tried to read an arithmetic column into a container");
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
                     const void* data = sqlite3_column_blob(_stmt.get(), idx);
                     size_t len = sqlite3_column_bytes(_stmt.get(), idx);
                     if (!out.resize(len)) {
-                        throw Error("Container does not have enough space to read column data");
+                        throw InternalError("Container does not have enough space to read column data");
                     }
                     std::memcpy(out.data(), data, len);
                     break;
@@ -208,7 +204,7 @@ namespace zxorm {
                 default: {
                     // this should never happen :pray:
                     assert(false);
-                    throw Error("Unknown SQL type encountered, something isn't implemented yet");
+                    throw InternalError("Unknown SQL type encountered, something isn't implemented yet");
                 }
             }
         }
@@ -231,10 +227,10 @@ namespace zxorm {
                 }
                 case SQLITE_TEXT:
                 case SQLITE_BLOB: {
-                    throw Error("Tried to read an arithmetic column into a container");
+                    throw InternalError("Tried to read an arithmetic column into a container");
                     size_t len = sqlite3_column_bytes(_stmt.get(), idx);
                     if (len > sizeof(T)) {
-                        throw Error("Param does not have enough space to fit column contents");
+                        throw InternalError("Param does not have enough space to fit column contents");
                     }
                     const void* data = sqlite3_column_blob(_stmt.get(), idx);
                     std::memcpy(&out_param, data, len);
@@ -251,7 +247,7 @@ namespace zxorm {
                 default: {
                     // this should never happen :pray:
                     assert(false);
-                    throw Error("Unknown SQL type encountered, something isn't implemented yet");
+                    throw InternalError("Unknown SQL type encountered, something isn't implemented yet");
                 }
             }
         }

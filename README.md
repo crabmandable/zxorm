@@ -8,6 +8,7 @@ ___
 * Low amount of boilerplate code
 * No requirement to inherit from anything or conform to a prescribed interface
 * SQL like syntax for writing more complicated queries without writing raw SQL
+* Make it impossible to construct an invalid query
 
 
 ## Getting started
@@ -35,7 +36,7 @@ in the database it is referring to.
 
 3. Create a connection
 ```cpp
-auto connection = zxorm::Connection<ObjectTable>::create("data.db");
+auto connection = zxorm::Connection<ObjectTable>("./path/to/my/data.db");
 ```
 The connection template accepts a list of tables, and should contain all the tables
 that your application is going to work with.
@@ -248,6 +249,53 @@ auto results_for_y = query.exec();
 It is important to note that when reusing queries, it is not possible to
 change the text of a query that was already prepared, it can only be bound with
 different parameters.
+
+___
+### Error handing
+There are four types of exceptions that are intentionally thrown from within
+the `zxorm` library:
+1. `zxorm::Error` - This is the base class for all zxorm exceptions.
+
+2. `zxorm::SQLExecutionError` - This will be thrown if a statment is unable to be
+executed, usually due to constraints.
+
+3. `zxorm::ConnectionError` - This will be thrown if there is a problem opening
+or closing a connection to the database.
+
+4. `zxorm::InternalError` - This likely indicates a bug in `zxorm`, and will hopefully
+never been seen outside of development.
+
+___
+### Connection options
+The connection constructor can take additional options, `flags` and `z_vfs`, these
+arguments are forwarded directly to SQLite.
+
+The default flags are `SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE`
+
+[You can read about them here](https://www.sqlite.org/capi3ref.html#sqlite3_open)
+
+#### Logger
+It is also possible to pass a function to the connection when it is created where logs
+can be sent. This is useful for debugging, but probably shouldn't be used in production.
+```cpp
+using connection_t = Connection<table1, table2, table3, //etc...
+
+auto connection = connection_t("mydata.db", 0, nullptr, [](auto level, const auto& msg) {
+    if (zxorm::log_level::Error == level)
+        std::cerr << "Ooops: " << msg;
+    else
+        std::cout << msg;
+});
+```
+
+Logs will be sent at two levels, `Error` & `Debug`
+
+`Error` logs will include most errors that cause an exception.
+
+`Debug` will include information about statement preparation, and raw queries
+that are actually sent to the database.
+
+[Here is the logger definition](./includes/zxorm/logger.hpp)
 ___
 
 ### Multithreading

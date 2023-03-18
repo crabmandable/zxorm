@@ -8,17 +8,9 @@
 #include <sstream>
 #include <iterator>
 #include <optional>
+#include "zxorm/logger.hpp"
 
 namespace zxorm {
-    enum class log_level {
-        Error = 0,
-        Warning = 1,
-        Info = 2,
-        Debug = 3,
-    };
-
-    using Logger = std::function<void(log_level, const std::string_view&)>;
-
     template<size_t N>
     struct FixedLengthString {
         constexpr FixedLengthString(const char (&str)[N]) {

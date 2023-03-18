@@ -81,7 +81,7 @@ using connection_t = Connection<table_t, tablepriv_t, table_with_column_constrai
 class TableTest : public ::testing::Test {
     protected:
     void SetUp() override {
-        auto created_conn = connection_t::create("test.db", 0, 0, &logger);
+        auto created_conn = connection_t("test.db", 0, 0, &logger);
         my_conn = std::make_shared<connection_t>(std::move(created_conn));
     }
 

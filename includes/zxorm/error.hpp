@@ -7,7 +7,6 @@ namespace zxorm {
     class Error : std::exception {
     protected:
         std::string _message;
-        Error() = default;
     public:
         const char* what() const noexcept override {
             return _message.c_str();
@@ -17,6 +16,8 @@ namespace zxorm {
             return _message;
         }
 
+    protected:
+        Error() = default;
         explicit Error(const std::string& message) : _message(message) {}
 
         explicit Error(const char* const err, sqlite3* handle) {
@@ -37,11 +38,11 @@ namespace zxorm {
         }
     };
 
-    class SQLiteError : public Error {
+    class SQLExecutionError : public Error {
     protected:
-        SQLiteError() = default;
+        SQLExecutionError() = default;
     public:
-        explicit SQLiteError(const char* const err, sqlite3* handle) : Error(err, handle) {}
+        explicit SQLExecutionError(const char* const err, sqlite3* handle) : Error(err, handle) {}
     };
 
     class ConnectionError : public Error {
@@ -49,4 +50,13 @@ namespace zxorm {
         explicit ConnectionError(const std::string& message) : Error(message) {}
         explicit ConnectionError(const char* const err, sqlite3* handle) : Error(err, handle) {}
     };
+
+    class InternalError : public Error {
+    protected:
+        InternalError() = default;
+    public:
+        explicit InternalError(const std::string& message) : Error(message) {}
+        explicit InternalError(const char* const err, sqlite3* handle) : Error(err, handle) {}
+    };
+
 };

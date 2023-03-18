@@ -47,7 +47,7 @@ using connection_t = Connection<table1, table2, table3>;
 class ForeignKeysTest : public ::testing::Test {
     protected:
     void SetUp() override {
-        my_conn = std::make_shared<connection_t>(connection_t::create("test.db", 0, 0, &logger));
+        my_conn = std::make_shared<connection_t>("test.db", 0, nullptr, &logger);
         my_conn->create_tables(true);
     }
 
