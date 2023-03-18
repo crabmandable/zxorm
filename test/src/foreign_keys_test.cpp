@@ -346,13 +346,13 @@ TEST_F(ForeignKeysTest, SelectDifferentRecordUsingJoin) {
     Object1 obj1 = {.text = test_text};
     my_conn->insert_record(obj1);
 
-    Object3 obj3 = {.obj1_id = obj1.id};
-    my_conn->insert_record(obj3);
+    Object2 obj2 = {.obj1_id = obj1.id};
+    my_conn->insert_record(obj2);
 
     auto result = my_conn->select_query<
         Select<Object1>,
-        From<Object3>,
-        JoinOn<table3::field_t<"obj1_id">, table1::field_t<"id">>
+        From<Object2>,
+        JoinOn<table2::field_t<"obj1_id">, table1::field_t<"id">>
     >().one().exec();
 
     Object1 obj1res = result.value();
@@ -364,12 +364,16 @@ TEST_F(ForeignKeysTest, LeftJoin) {
     auto test_text = "hello there";
     Object1 obj1 = {.text = test_text};
     my_conn->insert_record(obj1);
+    my_conn->insert_record(obj1);
 
     Object2 obj2_1 = {.obj1_id = obj1.id};
     Object2 obj2_2 = {.obj1_id = obj1.id};
-    Object2 obj2_3 = {.obj1_id = obj1.id + 10};
+    Object2 obj2_3 = {.obj1_id = obj1.id - 10};
     my_conn->insert_record(obj2_1);
     my_conn->insert_record(obj2_2);
+
+    // this requires turning off foreign key checks
+    my_conn->set_foreign_keys(false);
     my_conn->insert_record(obj2_3);
 
     auto results = my_conn->select_query<Select<Object2, Object1>, Join<Object1, join_type_t::LEFT_OUTER>>().many().exec();
@@ -395,6 +399,8 @@ TEST_F(ForeignKeysTest, RightJoin) {
     Object2 obj2_3 = {.obj1_id = obj1.id + 10};
     my_conn->insert_record(obj2_1);
     my_conn->insert_record(obj2_2);
+    // this requires turning off foreign key checks
+    my_conn->set_foreign_keys(false);
     my_conn->insert_record(obj2_3);
 
     auto result = my_conn->select_query<Select<Object1, Object2>,
@@ -515,4 +521,25 @@ TEST_F(ForeignKeysTest, OrderWithJoins) {
     ASSERT_EQ(rows[0].obj1_id, 2);
     ASSERT_EQ(rows[1].obj1_id, 1);
     ASSERT_EQ(rows[2].obj1_id, 3);
+}
+
+TEST_F(ForeignKeysTest, ForiegnConstraintFailure) {
+    my_conn->insert_many_records(std::vector<Object1>{
+        { .text = "B" },
+        { .text = "A" },
+        { .text = "C" },
+    });
+
+    EXPECT_THROW(my_conn->insert_record<Object2>({ .obj1_id = 4 }), SQLExecutionError);
+}
+
+TEST_F(ForeignKeysTest, ForiegnConstraintsOff) {
+    my_conn->insert_many_records(std::vector<Object1>{
+        { .text = "B" },
+        { .text = "A" },
+        { .text = "C" },
+    });
+
+    my_conn->set_foreign_keys(false);
+    EXPECT_NO_THROW(my_conn->insert_record<Object2>({ .obj1_id = 4 }));
 }

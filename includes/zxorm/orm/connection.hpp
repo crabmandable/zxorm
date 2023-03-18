@@ -165,6 +165,8 @@ namespace zxorm {
 
         template<class T>
         void truncate();
+
+        void set_foreign_keys(bool on);
     };
 
     template <class... Table>
@@ -208,6 +210,8 @@ namespace zxorm {
                 throw err;
             }
         }};
+
+        set_foreign_keys(true);
     }
 
     template <class... Table>
@@ -858,5 +862,14 @@ namespace zxorm {
     {
         using table_t = table_for_class_t<T>;
         exec(std::string("DELETE FROM `") + table_t::name.value + "`;");
+    }
+
+    template <class... Table>
+    void Connection<Table...>::set_foreign_keys(bool on)
+    {
+        if (on)
+            exec("PRAGMA foreign_keys = ON;");
+        else
+            exec("PRAGMA foreign_keys = OFF;");
     }
 };

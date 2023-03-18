@@ -68,6 +68,22 @@ TEST_F(QueryTest, InsertSomething)
     ASSERT_EQ(obj.id, 1);
 }
 
+TEST_F(QueryTest, InsertSomethingAgain)
+{
+    Object obj;
+
+    obj.some_text = "Some text";
+    obj.some_float = 3.14;
+    obj.some_id = 42;
+    obj.some_bool = true;
+
+    my_conn->insert_record(obj);
+    ASSERT_EQ(obj.id, 1);
+
+    my_conn->insert_record(obj);
+    ASSERT_EQ(obj.id, 2);
+}
+
 TEST_F(QueryTest, InsertObjWithoutRowId)
 {
     OtherObj obj = { .some_text = "Some text" };
