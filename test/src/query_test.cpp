@@ -32,7 +32,18 @@ struct OtherObj {
 using pk_is_text_t = Table<"test2", OtherObj,
     Column<"text", &OtherObj::some_text, PrimaryKey<conflict_t::abort>>>;
 
-using connection_t = Connection<table_t, pk_is_text_t>;
+struct ConstrainedObj {
+    int id = 0;
+    int number = 1;
+    std::optional<int> nullable = 1;
+};
+using constrained_table_t = Table<"test3", ConstrainedObj,
+    Column<"id", &ConstrainedObj::id, PrimaryKey<conflict_t::abort>>,
+    Column<"number", &ConstrainedObj::number, Unique<conflict_t::abort>>,
+    Column<"nullable", &ConstrainedObj::nullable, NotNull<conflict_t::abort>>
+    >;
+
+using connection_t = Connection<table_t, pk_is_text_t, constrained_table_t>;
 
 class QueryTest : public ::testing::Test {
     protected:
@@ -850,4 +861,31 @@ TEST_F(QueryTest, ReuseAQueryWithMultipleBinds)
     vec = query.exec().to_vector();
     ASSERT_EQ(vec[0], 3.14f * 3);
     ASSERT_EQ(vec[1], 3.14f * 4);
+}
+
+TEST_F(QueryTest, AbortedUniqueConstraintThrows)
+{
+    my_conn->insert_record(ConstrainedObj{.number = 10});
+    ASSERT_THROW(my_conn->insert_record(ConstrainedObj{.number = 10}), SQLConstraintError);
+}
+
+TEST_F(QueryTest, AbortedNotNullConstraintThrows)
+{
+    ASSERT_THROW(my_conn->insert_record(ConstrainedObj{.nullable = std::nullopt}), SQLConstraintError);
+}
+
+struct DuplicateColumnName {
+    int id;
+    int number;
+};
+using duplicate_column_name_table_t = Table<"test4", DuplicateColumnName,
+    Column<"duplicate", &DuplicateColumnName::id, PrimaryKey<conflict_t::abort>>,
+    Column<"duplicate", &DuplicateColumnName::number, Unique<conflict_t::abort>>
+    >;
+
+TEST_F(QueryTest, DuplicateColumnNameThrows)
+{
+    my_conn = nullptr;
+    auto conn = Connection<duplicate_column_name_table_t>("test.db", 0, nullptr, &logger);
+    ASSERT_THROW(conn.create_tables(), SQLExecutionError);
 }

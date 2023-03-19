@@ -530,7 +530,7 @@ TEST_F(ForeignKeysTest, ForiegnConstraintFailure) {
         { .text = "C" },
     });
 
-    EXPECT_THROW(my_conn->insert_record<Object2>({ .obj1_id = 4 }), SQLExecutionError);
+    EXPECT_THROW(my_conn->insert_record<Object2>({ .obj1_id = 4 }), SQLConstraintError);
 }
 
 TEST_F(ForeignKeysTest, ForiegnConstraintsOff) {

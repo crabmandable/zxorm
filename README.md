@@ -252,18 +252,24 @@ different parameters.
 
 ___
 ### Error handing
-There are four types of exceptions that are intentionally thrown from within
+There are five types of exceptions that are intentionally thrown from within
 the `zxorm` library:
 1. `zxorm::Error` - This is the base class for all zxorm exceptions.
 
-2. `zxorm::SQLExecutionError` - This will be thrown if a statment is unable to be
-executed, usually due to constraints.
+2. `zxorm::SQLConstraintError` - This will be thrown if a statment is unable to be
+executed, due to constraints
 
-3. `zxorm::ConnectionError` - This will be thrown if there is a problem opening
+3. `zxorm::SQLExecutionError` - This will be thrown if a statment is unable to be
+initialized or executed
+
+4. `zxorm::ConnectionError` - This will be thrown if there is a problem opening
 or closing a connection to the database.
 
-4. `zxorm::InternalError` - This likely indicates a bug in `zxorm`, and will hopefully
+5. `zxorm::InternalError` - This likely indicates a bug in `zxorm`, and will hopefully
 never been seen outside of development.
+
+Where relevant, the `sqlite_errcode()` function can be used to query the [sqlite
+extended result code](https://www.sqlite.org/rescode.html#extrc) that caused the exception.
 
 ___
 ### Connection options

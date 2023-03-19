@@ -4,9 +4,14 @@
 #include <exception>
 
 namespace zxorm {
+    inline bool is_constraint_error(int result) {
+        return (result & 0xff) == SQLITE_CONSTRAINT;
+    }
+
     class Error : std::exception {
     protected:
         std::string _message;
+        int _sqlite_result = SQLITE_OK;
     public:
         const char* what() const noexcept override {
             return _message.c_str();
@@ -16,20 +21,22 @@ namespace zxorm {
             return _message;
         }
 
+        int sqlite_errcode() const noexcept {
+            return _sqlite_result;
+        }
+
     protected:
         Error() = default;
         explicit Error(const std::string& message) : _message(message) {}
 
         explicit Error(const char* const err, sqlite3* handle) {
-            int sqlite_result = SQLITE_OK;
-
-            sqlite_result = sqlite3_errcode(handle);
+            _sqlite_result = sqlite3_extended_errcode(handle);
 
             std::ostringstream os;
             os << err;
-            if (sqlite_result != SQLITE_OK) {
+            if (_sqlite_result != SQLITE_OK) {
                 os << ": ["
-                    << sqlite3_errstr(sqlite_result)
+                    << sqlite3_errstr(_sqlite_result)
                     << "] "
                     << sqlite3_errmsg(handle);
             }
@@ -38,11 +45,19 @@ namespace zxorm {
         }
     };
 
+
     class SQLExecutionError : public Error {
     protected:
         SQLExecutionError() = default;
     public:
         explicit SQLExecutionError(const char* const err, sqlite3* handle) : Error(err, handle) {}
+    };
+
+    class SQLConstraintError : public Error {
+    protected:
+        SQLConstraintError() = default;
+    public:
+        explicit SQLConstraintError(const char* const err, sqlite3* handle) : Error(err, handle) {}
     };
 
     class ConnectionError : public Error {

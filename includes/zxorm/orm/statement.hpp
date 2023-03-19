@@ -35,7 +35,7 @@ namespace zxorm {
             sqlite3_stmt* stmt = nullptr;
             int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
-                auto err = InternalError("Unable to initialize statement", handle);
+                auto err = SQLExecutionError("Unable to initialize statement", handle);
                 _logger(log_level::Error, err);
                 throw err;
             }
@@ -170,7 +170,11 @@ namespace zxorm {
             int result = sqlite3_step(_stmt.get());
             _step_count++;
             if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
-                throw SQLExecutionError("Unable to execute statment", _handle);
+                if (is_constraint_error(result)) {
+                    throw SQLConstraintError("Constraint failed", _handle);
+                } else {
+                    throw SQLExecutionError("Unable to execute statment", _handle);
+                }
             }
 
             _done = result == SQLITE_DONE;
