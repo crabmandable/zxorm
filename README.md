@@ -93,10 +93,32 @@ auto prepared_query = connection.select_query<Object>().one();
 // and then
 auto results = prepared_query.exec();
 ```
+##### many
+`many` means that the `exec` funciton will return a `zxorm::RecordIterator<Object>`,
+which allows the results of the query to be streamed.
+```cpp
+for (const Object& row: results) {
+    std::cout << row.some_text << std::endl;
+}
+```
+
+The result of the query can also be loaded into memory all at once by using the
+`to_vector` function:
+```cpp
+std::vector<Object> rows = results.to_vector();
+```
+
+##### one
+`one` will apply a `LIMIT 1` clause (if no limit is already specified), and
+makes that the `exec` function return an optional.
+```cpp
+std::optional<Object> maybe_object = prepared_query.exec();
+```
+
 
 #### Where
 
-A `WHERE` clause can also be added like so:
+A `WHERE` clause can be added by using `where_many` or `where_one`:
 ```cpp
 auto prepared_query = connection.select_query<Object>()
     .where_many(ObjectTable::field_t<"some_text">().like("hello %"));
@@ -114,14 +136,14 @@ Similarly, `order` and `limits` can be applied
 auto results = connection.select_query<Object>()
     .order_by<ObjectTable::field_t<"some_text">>(zxorm::order_t::DESC)
     .limit(10)
-    .many();
+    .many().exec();
 ```
 
 #### Selecting specific columns:
 
 The same field template can be used to select specific columns too:
 ```cpp
-auto results = connection.select_query<ObjectTable::field_t<"some_text">>().many();
+auto results = connection.select_query<ObjectTable::field_t<"some_text">>().many().exec();
 ```
 
 Multiple items can be selected using the `Select` template.

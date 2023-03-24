@@ -1,16 +1,16 @@
 Note to self: start from top
 
-* Negative tests
-
-* Docs
-
 * Reorganize code - need to split `clause` up, and try to clean up `connection`
 
 * Transaction tests
 
+* Docs
+
 * REGEXP
 
 * Bulk update
+
+* Migrations
 
 * Relationships
 
