@@ -129,7 +129,12 @@ namespace zxorm {
                 _blob_bindings[idx] = std::vector<uint8_t>();
                 _blob_bindings[idx].resize(len);
                 std::memcpy(_blob_bindings[idx].data(), param_to_bind.data(), len);
-                result = sqlite3_bind_blob(_stmt.get(), idx, _blob_bindings[idx].data(), _blob_bindings[idx].size(), nullptr);
+
+                if constexpr (ignore_qualifiers::is_string<T>() || ignore_qualifiers::is_string_view<T>()) {
+                    result = sqlite3_bind_text(_stmt.get(), idx, (char*)_blob_bindings[idx].data(), _blob_bindings[idx].size(), nullptr);
+                } else {
+                    result = sqlite3_bind_blob(_stmt.get(), idx, _blob_bindings[idx].data(), _blob_bindings[idx].size(), nullptr);
+                }
             }
 
             if (result != SQLITE_OK) {

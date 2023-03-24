@@ -389,6 +389,8 @@ TEST_F(ForeignKeysTest, LeftJoin) {
     ASSERT_FALSE(std::get<1>(rows[2]).has_value());
 }
 
+// RIGHT & OUTER weren't supported until 3.39.0
+#if SQLITE_VERSION_NUMBER >= 3039000
 TEST_F(ForeignKeysTest, RightJoin) {
     auto test_text = "hello there";
     Object1 obj1 = {.text = test_text};
@@ -497,6 +499,7 @@ TEST_F(ForeignKeysTest, SelectAColumnWithJoins) {
 
     ASSERT_FALSE(rows[1].has_value());
 }
+#endif
 
 TEST_F(ForeignKeysTest, OrderWithJoins) {
     my_conn->insert_many_records(std::vector<Object1>{

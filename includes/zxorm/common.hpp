@@ -121,6 +121,12 @@ namespace zxorm {
         }
 
         template <typename T>
+        static constexpr bool is_string_view() {
+            using plain = typename remove_optional<std::remove_cvref_t<T>>::type;
+            return traits::is_basic_string_view<plain>();
+        }
+
+        template <typename T>
         static constexpr bool is_floating_point() {
             using plain = typename remove_optional<std::remove_cvref_t<T>>::type;
             return std::is_floating_point_v<plain>;
