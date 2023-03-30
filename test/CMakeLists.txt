@@ -1,13 +1,12 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.14)
 
-project(zxorm_tests CXX)
+project(zxormTests LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+include(../cmake/project-is-top-level.cmake)
+include(../cmake/folders.cmake)
+include(../cmake/windows-set-path.cmake)
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../" zxorm)
-
+# ---- Dependencies ----
 
 # GTEST
 include(FetchContent)
@@ -20,27 +19,22 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-enable_testing()
+if(PROJECT_IS_TOP_LEVEL)
+  # find_package(zxorm REQUIRED)
+  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../" zxorm)
+  enable_testing()
+endif()
+
+# ---- Tests ----
 
 set(test_sources "")
-file(GLOB_RECURSE test_sources "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp")
-add_executable(runTests ${test_sources})
-target_link_libraries(runTests pthread zxorm GTest::gtest_main)
+file(GLOB_RECURSE test_sources "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp")
+add_executable(zxorm_test ${test_sources})
+target_link_libraries(zxorm_test pthread zxorm::zxorm GTest::gtest_main)
+target_compile_features(zxorm_test PRIVATE cxx_std_20)
 
-include(GoogleTest)
-gtest_discover_tests(runTests)
+add_test(NAME zxorm_test COMMAND zxorm_test)
 
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
+# ---- End-of-file commands ----
 
-# set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wfatal-errors")
-
-target_compile_options(runTests PRIVATE
-  $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
-  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
-)
-
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-        ${CMAKE_BINARY_DIR}/compile_commands.json
-        ${CMAKE_SOURCE_DIR}/../compile_commands.json
-)
+add_folders(Test)
