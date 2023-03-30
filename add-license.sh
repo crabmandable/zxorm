@@ -1,3 +1,7 @@
+#!/bin/bash
+
+for file in $(find $(dirname $0)/includes -name "*.hpp" -type f); do
+    cat <<EOF >> "${file}.tmp"
 /*
 * Copyright (c) 2023 Zach Gerstman
 * https://github.com/crabmandable/zxorm
@@ -5,15 +9,8 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at https://mozilla.org/MPL/2.0/.
 */
-#pragma once
-#include <functional>
-#include <string_view>
+EOF
+    cat "$file" >> "$file.tmp"
+    mv "$file.tmp" "$file"
+done
 
-namespace zxorm {
-    enum class log_level {
-        Error = 0,
-        Debug = 1,
-    };
-
-    using Logger = std::function<void(log_level, const std::string_view&)>;
-};
