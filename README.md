@@ -61,14 +61,32 @@ ___
 The library is header only, so all you need to do is include the `includes` directory,
 and link sqlite
 ```sh
-g++ example.cpp -Izxorm/includes -o example.bin `pkg-config --libs sqlite3` -std=c++20
+g++ example.cpp -Izxorm/include -o example.bin `pkg-config --libs sqlite3` -std=c++20
 ```
 
 ___
 There is also a `CMakeLists.txt` that can be used for integrating easily into a
-CMake project. Simply include this repository as a subdirectory:
+CMake project. So you can do one of the following:
 ```cmake
 add_subdirectory("./zxorm")
+```
+or
+```cmake
+FetchContent_Declare(
+  zxorm
+  GIT_REPOSITORY https://github.com/crabmandable/zxorm.git
+  GIT_TAG <whatever the current version is>
+)
+FetchContent_MakeAvailable(zxorm)
+```
+or
+```sh
+# build & install zxorm
+cmake -B build && cmake --build build && sudo cmake --install build
+```
+```cmake
+# require zxorm in your CMakeLists.txt
+requries(zxorm)
 ```
 
 Currently only `gcc` 12 and `clang` 15 are tested and working on linux

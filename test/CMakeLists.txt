@@ -20,7 +20,6 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 if(PROJECT_IS_TOP_LEVEL)
-  # find_package(zxorm REQUIRED)
   add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../" zxorm)
   enable_testing()
 endif()
