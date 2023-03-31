@@ -76,7 +76,7 @@ namespace zxorm {
                 return sqlite_column_type::REAL;
             } else {
                 static_assert(std::is_same_v<T, std::false_type>,
-                    "Member type is not convertable to an sql type. "
+                    "Member type is not convertible to an sql type. "
                     "Please use only arithmetic types or containers with continuous memory, "
                     "or std::optional containing either type");
             }

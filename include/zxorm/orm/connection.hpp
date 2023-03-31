@@ -657,7 +657,7 @@ namespace zxorm {
                     auto query = table_t::insert_query(batch_size);
                     insert_stmt = make_statement(query);
                 }
-                // first itertion, initiaize statment
+                // first itertion, initiaize statement
                 else if (inserted == 0) {
                     auto query = table_t::insert_query(batch_size);
                     insert_stmt = make_statement(query);

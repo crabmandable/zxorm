@@ -1,5 +1,5 @@
 # ZxORM
-**Z**ach's **O**bject **R**elational **M**apping library - A C++20 ORM for SQLite
+**Z**ach's **O**object **R**elational **M**apping library - A C++20 ORM for SQLite
 ___
 
 `zxorm` is an attempt to create an ORM for C++ that achieves the following:
@@ -86,7 +86,7 @@ cmake -B build && cmake --build build && sudo cmake --install build
 ```
 ```cmake
 # require zxorm in your CMakeLists.txt
-requries(zxorm)
+requires(zxorm)
 ```
 
 Currently only `gcc` 12 and `clang` 15 are tested and working on linux
@@ -112,7 +112,7 @@ auto prepared_query = connection.select_query<Object>().one();
 auto results = prepared_query.exec();
 ```
 ##### many
-`many` means that the `exec` funciton will return a `zxorm::RecordIterator<Object>`,
+`many` means that the `exec` function will return a `zxorm::RecordIterator<Object>`,
 which allows the results of the query to be streamed.
 ```cpp
 for (const Object& row: results) {
@@ -296,10 +296,10 @@ There are five types of exceptions that are intentionally thrown from within
 the `zxorm` library:
 1. `zxorm::Error` - This is the base class for all zxorm exceptions.
 
-2. `zxorm::SQLConstraintError` - This will be thrown if a statment is unable to be
+2. `zxorm::SQLConstraintError` - This will be thrown if a statement is unable to be
 executed, due to constraints
 
-3. `zxorm::SQLExecutionError` - This will be thrown if a statment is unable to be
+3. `zxorm::SQLExecutionError` - This will be thrown if a statement is unable to be
 initialized or executed
 
 4. `zxorm::ConnectionError` - This will be thrown if there is a problem opening

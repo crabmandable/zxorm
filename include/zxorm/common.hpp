@@ -162,7 +162,7 @@ namespace zxorm {
     template<typename T>
     concept OptionalT = ignore_qualifiers::is_optional<T>();
 
-    // unqiue tuple https://stackoverflow.com/a/57528226
+    // unique tuple https://stackoverflow.com/a/57528226
     namespace __unique_tuple_detail {
         template <typename T, typename... Ts>
         struct unique : std::type_identity<T> {};

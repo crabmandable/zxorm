@@ -25,7 +25,7 @@ namespace zxorm {
         struct constraints<MemberT, C...> {
             using type = std::conditional_t<
                 // if the column is a non optional string, set a default empty string
-                // as long as it doesnt already have default, or a not null
+                // as long as it doesn't already have default, or a not null
                 ignore_qualifiers::is_string<MemberT>() &&
                     not any_of<constraint_is_default<C>::value...> &&
                     not any_of<constraint_is_not_null<C>::value...>,

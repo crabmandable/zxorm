@@ -110,7 +110,7 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                throw InternalError("Unable to bind parameter to statment", _handle);
+                throw InternalError("Unable to bind parameter to statement", _handle);
             }
             _is_bound[idx] = true;
         }
@@ -145,7 +145,7 @@ namespace zxorm {
             }
 
             if (result != SQLITE_OK) {
-                throw InternalError("Unable to bind parameter to statment", _handle);
+                throw InternalError("Unable to bind parameter to statement", _handle);
             }
 
             _is_bound[idx] = true;
@@ -154,7 +154,7 @@ namespace zxorm {
         void rewind() {
             int result = sqlite3_reset(_stmt.get());
             if (result != SQLITE_OK) {
-                throw InternalError( "Unable to reset statment", _handle);
+                throw InternalError( "Unable to reset statement", _handle);
             }
             _done = false;
             _step_count = 0;
@@ -185,7 +185,7 @@ namespace zxorm {
                 if (is_constraint_error(result)) {
                     throw SQLConstraintError("Constraint failed", _handle);
                 } else {
-                    throw SQLExecutionError("Unable to execute statment", _handle);
+                    throw SQLExecutionError("Unable to execute statement", _handle);
                 }
             }
 

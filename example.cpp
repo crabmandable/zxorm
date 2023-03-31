@@ -10,13 +10,13 @@ using namespace zxorm;
 /**
  * Student - This is the "Object" in ORM for this example
  *
- *           Nothing special goin on here, just a class/struct
+ *           Nothing special going on here, just a class/struct
  *           that represents a row in our db table
  */
 struct Student {
     enum Year {
         Freshman = 1,
-        Sophmore = 2,
+        Sophomore = 2,
         Senior = 3,
     };
 
@@ -97,8 +97,8 @@ int main (void) {
 
     connection.insert_many_records(std::vector<Student> {
         { .year = Year::Freshman, .name = "jojo",    .gpa = 3.44 },
-        { .year = Year::Sophmore, .name = "janet",   .gpa = 2.4  },
-        { .year = Year::Sophmore, .name = "bob",     .gpa = 3.9  },
+        { .year = Year::Sophomore, .name = "janet",   .gpa = 2.4  },
+        { .year = Year::Sophomore, .name = "bob",     .gpa = 3.9  },
         { .year = Year::Senior,   .name = "billie",  .gpa = 3.95 },
         { .year = Year::Senior,   .name = "wayne",   .gpa = 2.98 },
         { .year = Year::Freshman, .name = "charlie", .gpa = 1.3 },
@@ -112,7 +112,7 @@ int main (void) {
     // find many records with a more complicated WHERE clause
     auto students = connection.select_query<StudentTable>()
         .where_many(StudentTable::field_t<"gpa">() >= PASS_GPA &&
-                    StudentTable::field_t<"year">() >= Year::Sophmore)
+                    StudentTable::field_t<"year">() >= Year::Sophomore)
         .exec();
 
     std::cout << "Students who have a passing GPA >= "
