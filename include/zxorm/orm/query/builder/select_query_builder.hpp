@@ -29,7 +29,7 @@ namespace zxorm {
         }
 
     public:
-        SelectQueryBuilder(sqlite3* handle, Logger logger) :
+        SelectQueryBuilder(sqlite3* handle, std::weak_ptr<Logger> logger) :
             Super(handle, logger) {}
 
         SelectQueryBuilder(SelectQueryBuilder&& other) = default;

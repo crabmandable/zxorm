@@ -33,7 +33,7 @@ namespace zxorm {
             __delete_detail::DeleteColumnClause>;
 
     public:
-        DeleteQueryBuilder(sqlite3* handle, Logger logger) :
+        DeleteQueryBuilder(sqlite3* handle, std::weak_ptr<Logger> logger) :
             Super(handle, logger) {}
 
         DeleteQueryBuilder(DeleteQueryBuilder&& other) = default;

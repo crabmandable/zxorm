@@ -18,7 +18,7 @@ namespace zxorm {
     protected:
         const char* _table_name = Table::name.value;
         sqlite3* _handle;
-        Logger _logger;
+        std::weak_ptr<Logger> _logger;
         std::shared_ptr<BindingClauseBase> _where;
         std::shared_ptr<Statement> _stmt;
 
@@ -63,7 +63,7 @@ namespace zxorm {
             _where = std::make_shared<Where<decltype(e.bindings())>>(e);
         }
 
-        BaseQueryBuilder(sqlite3* handle, Logger logger) : _handle(handle), _logger(logger) { }
+        BaseQueryBuilder(sqlite3* handle, std::weak_ptr<Logger> logger) : _handle(handle), _logger(logger) { }
 
         BaseQueryBuilder(BaseQueryBuilder&& old) = default;
         BaseQueryBuilder& operator=(BaseQueryBuilder&& old) = default;

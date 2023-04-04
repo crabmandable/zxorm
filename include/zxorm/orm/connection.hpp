@@ -33,7 +33,7 @@ namespace zxorm {
         using db_handle_ptr = std::unique_ptr<sqlite3, std::function<void(sqlite3*)>>;
 
         db_handle_ptr _db_handle;
-        Logger _logger = nullptr;
+        std::shared_ptr<Logger> _logger;
 
         // more complicated queries are omitted, since this is only relevant for things that can be cached
         // i.e. queries that always have the same number of binds
@@ -93,6 +93,8 @@ namespace zxorm {
         template<class T>
             void insert_record_impl (
                     std::conditional_t<not std::is_const_v<T> && table_has_rowid<T>(), T&, const T&> record);
+
+        void log(log_level level, const std::string_view& msg);
 
     public:
 
@@ -177,6 +179,13 @@ namespace zxorm {
     };
 
     template <class... Table>
+    void Connection<Table...>::log(log_level level, const std::string_view& msg) {
+        if (_logger) {
+            (*_logger)(level, msg);
+        }
+    }
+
+    template <class... Table>
     Connection<Table...>::Connection(
             const char* file_name,
             int flags,
@@ -188,32 +197,27 @@ namespace zxorm {
         }
 
         if (logger) {
-            _logger = logger;
-        }
-        else {
-            _logger = [](auto...) {};
+            _logger = std::make_shared<Logger>(std::move(logger));
         }
 
 
         std::ostringstream oss;
         oss << "Opening sqlite connection with flags: " << flags;
-        _logger(log_level::Debug, oss.str().c_str());
+        log(log_level::Debug, oss.str().c_str());
 
         sqlite3* db_handle = nullptr;
         int result = sqlite3_open_v2(file_name, &db_handle, flags, z_vfs);
         if (result != SQLITE_OK || !db_handle) {
             auto err = ConnectionError("Unable to open sqlite connection", db_handle);
-            _logger(log_level::Error, err);
+            log(log_level::Error, err);
             throw err;
         }
 
-        _db_handle = {db_handle, [logger](sqlite3* handle) {
+        _db_handle = {db_handle, [this](sqlite3* handle) {
             int result = sqlite3_close_v2(handle);
             if (result != SQLITE_OK) {
                 auto err = ConnectionError("Unable to destroy connection", handle);
-                if (logger) {
-                    logger(log_level::Error, err);
-                }
+                log(log_level::Error, err);
                 throw err;
             }
         }};

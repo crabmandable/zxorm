@@ -24,7 +24,7 @@ namespace zxorm {
     class Statement {
         private:
         sqlite3* _handle;
-        Logger _logger;
+        std::weak_ptr<Logger> _logger;
         std::unique_ptr<sqlite3_stmt, std::function<void(sqlite3_stmt*)>> _stmt;
         size_t _parameter_count;
         std::map<size_t, bool> _is_bound;
@@ -33,25 +33,32 @@ namespace zxorm {
         size_t _step_count = 0;
         bool _done = false;
 
+        static inline void log(const std::weak_ptr<Logger>& logger, log_level level, const std::string_view& msg) {
+            auto unwrapped = logger.lock();
+            if (unwrapped) {
+                (*unwrapped)(level, msg);
+            }
+        }
+
         public:
-        Statement(sqlite3* handle, Logger logger, const std::string& query) : _handle{handle}, _logger{logger}
+        Statement(sqlite3* handle, std::weak_ptr<Logger> logger, const std::string& query) : _handle{handle}, _logger{logger}
         {
-            _logger(log_level::Debug, "Initializing statement");
-            _logger(log_level::Debug, query.c_str());
+            log(_logger, log_level::Debug, "Initializing statement");
+            log(_logger, log_level::Debug, query.c_str());
 
             sqlite3_stmt* stmt = nullptr;
             int result = sqlite3_prepare_v2(handle, query.c_str(), query.size() + 1, &stmt, nullptr);
             if (result != SQLITE_OK || !stmt) {
                 auto err = SQLExecutionError("Unable to initialize statement", handle);
-                _logger(log_level::Error, err);
+                log(_logger, log_level::Error, err);
                 throw err;
             }
 
-            _stmt = {stmt, [logger, handle](sqlite3_stmt* s) {
+            _stmt = {stmt, [logger=_logger, handle](sqlite3_stmt* s) {
                 int result = sqlite3_finalize(s);
                 if (result != SQLITE_OK) {
                     auto err = InternalError("Statement error", handle);
-                    logger(log_level::Error, err);
+                    log(logger, log_level::Error, err);
                 }
             }};
 
