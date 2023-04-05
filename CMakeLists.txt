@@ -4,7 +4,7 @@ include(cmake/prelude.cmake)
 
 project(
     zxorm
-    VERSION 0.1.2
+    VERSION 0.1.3
     DESCRIPTION "Zach's SQLite ORM"
     HOMEPAGE_URL "https://github.com/crabmandable/zxorm"
     LANGUAGES NONE
