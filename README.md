@@ -89,7 +89,7 @@ cmake -B build && cmake --build build && sudo cmake --install build
 requires(zxorm)
 ```
 
-Currently only `gcc` 12 and `clang` 15 are tested and working on linux
+Currently `gcc` 12 and `clang` 15 are tested and working on linux, and AppleClang 14 on MacOs
 
 I don't have a Windows machine, and won't be adding support any time soon.
 ___
