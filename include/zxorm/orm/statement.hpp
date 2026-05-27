@@ -160,7 +160,10 @@ namespace zxorm {
 
         void rewind() {
             int result = sqlite3_reset(_stmt.get());
-            if (result != SQLITE_OK) {
+            // sqlite3_reset returns the previous sqlite3_step result. A prior
+            // constraint failure was already reported by step(), and the
+            // statement is reset and reusable after this call.
+            if (result != SQLITE_OK && !is_constraint_error(result)) {
                 throw InternalError( "Unable to reset statement", _handle);
             }
             _done = false;
