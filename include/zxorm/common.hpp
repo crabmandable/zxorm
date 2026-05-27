@@ -7,6 +7,8 @@
 */
 #pragma once
 #include <algorithm>
+#include <array>
+#include <cstdio>
 #include <sqlite3.h>
 #include <type_traits>
 #include <variant>
@@ -262,6 +264,10 @@ namespace zxorm {
 
     template<typename T>
     void dump_type () {
+#ifdef _MSC_VER
+        printf("%s\n", __FUNCSIG__);
+#else
         printf("%s\n", __PRETTY_FUNCTION__);
+#endif
     }
 };

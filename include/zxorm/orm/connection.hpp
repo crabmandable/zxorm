@@ -290,8 +290,11 @@ namespace zxorm {
     constexpr bool Connection<Table...>::table_has_rowid()
     {
         using table_t = table_for_class_t<C>;
-        if (!table_t::has_primary_key) return false;
-        return table_t::primary_key_t::sql_column_type == sqlite_column_type::INTEGER;
+        if constexpr (!table_t::has_primary_key) {
+            return false;
+        } else {
+            return table_t::primary_key_t::sql_column_type == sqlite_column_type::INTEGER;
+        }
     }
 
 
@@ -315,22 +318,22 @@ namespace zxorm {
     template <FixedLengthString table_name, typename selectables_tuple>
     static constexpr bool selection_is_optional_v = selection_is_optional<table_name, selectables_tuple>::value;
 
-    template <class... Table>
-    template<bool results_are_optional, typename selectables_tuple, typename From, typename T>
-    struct Connection<Table...>::selection_for_clause : std::type_identity<
-        __selection<results_are_optional || selection_is_optional_v<table_for_class_t<T>::name, selectables_tuple>, table_for_class_t<T>>
+    template <typename ConnectionT, bool results_are_optional, typename selectables_tuple, typename From, typename T>
+    struct selection_for_clause_impl;
+
+    template <class... Table, bool results_are_optional, typename selectables_tuple, typename From, typename T>
+    struct selection_for_clause_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, T> : std::type_identity<
+        __selection<results_are_optional || selection_is_optional_v<Connection<Table...>::template table_for_class<T>::type::name, selectables_tuple>, typename Connection<Table...>::template table_for_class<T>::type>
     >{};
 
-    template <class... Table>
-    template<bool results_are_optional, typename selectables_tuple, typename From, typename T, FixedLengthString field_name>
-    struct Connection<Table...>::selection_for_clause<results_are_optional, selectables_tuple, From, Field<T, field_name>>: std::type_identity<
+    template <class... Table, bool results_are_optional, typename selectables_tuple, typename From, typename T, FixedLengthString field_name>
+    struct selection_for_clause_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, Field<T, field_name>>: std::type_identity<
         __selection<results_are_optional || selection_is_optional_v<T::name, selectables_tuple>, Field<T, field_name>>
     >{};
 
-    template <class... Table>
-    template<bool results_are_optional, typename selectables_tuple, typename From, typename T, bool distinct>
-    struct Connection<Table...>::selection_for_clause<results_are_optional, selectables_tuple, From, Count<T, distinct>> {
-        using table_t = table_for_class_t<T>;
+    template <class... Table, bool results_are_optional, typename selectables_tuple, typename From, typename T, bool distinct>
+    struct selection_for_clause_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, Count<T, distinct>> {
+        using table_t = typename Connection<Table...>::template table_for_class<T>::type;
         static_assert(table_t::has_primary_key,
                 "Table must have a primary key in order to deduce the `Count` column. "
                 "Use `CountAll` or a specific Field instead."
@@ -339,35 +342,34 @@ namespace zxorm {
         using type = __count<Field<table_t, pk_t::name>, distinct>;
     };
 
-    template <class... Table>
-    template<bool results_are_optional, typename selectables_tuple, typename From, typename Field, bool distinct>
+    template <class... Table, bool results_are_optional, typename selectables_tuple, typename From, typename Field, bool distinct>
     requires(is_field<Field>)
-    struct Connection<Table...>::selection_for_clause<results_are_optional, selectables_tuple, From, Count<Field, distinct>> : std::type_identity<
+    struct selection_for_clause_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, Count<Field, distinct>> : std::type_identity<
         __count<Field, distinct>
     >{};
 
-    template <class... Table>
-    template<bool results_are_optional, typename selectables_tuple, typename From>
-    struct Connection<Table...>::selection_for_clause<results_are_optional, selectables_tuple, From, CountAll> : std::type_identity<
+    template <class... Table, bool results_are_optional, typename selectables_tuple, typename From>
+    struct selection_for_clause_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, CountAll> : std::type_identity<
         __count_all<From>
     >{};
 
-    template <class... Table>
-    template<bool results_are_optional, typename selectables_tuple, typename From, typename T>
-    struct Connection<Table...>::select_type : std::type_identity<
+    template <typename ConnectionT, bool results_are_optional, typename selectables_tuple, typename From, typename T>
+    struct select_type_impl;
+
+    template <class... Table, bool results_are_optional, typename selectables_tuple, typename From, typename T>
+    struct select_type_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, T> : std::type_identity<
         __select_impl<
-            table_for_class_t<From>,
-            typename selection_for_clause<results_are_optional, selectables_tuple, From, T>::type
+            typename Connection<Table...>::template table_for_class<From>::type,
+            typename selection_for_clause_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, T>::type
         >
     > {};
 
     // This is the specialization for when dealing with a `Select<>` clause
-    template <class... Table>
-    template<bool results_are_optional, typename selectables_tuple, typename From, typename... U>
-    struct Connection<Table...>::select_type<results_are_optional, selectables_tuple, From, Select<U...>> {
+    template <class... Table, bool results_are_optional, typename selectables_tuple, typename From, typename... U>
+    struct select_type_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, Select<U...>> {
         using type = __select_impl<
-            table_for_class_t<From>,
-            typename selection_for_clause<results_are_optional, selectables_tuple, From, U>::type...
+            typename Connection<Table...>::template table_for_class<From>::type,
+            typename selection_for_clause_impl<Connection<Table...>, results_are_optional, selectables_tuple, From, U>::type...
         >;
     };
 
@@ -412,13 +414,16 @@ namespace zxorm {
     struct Connection<Table...>::make_joins<JoinedTables, JoinedClauses, std::tuple<T...>> :
         make_joins<JoinedTables, JoinedClauses, T...> {};
 
-    template <class... Table>
-    template <typename T>
-    struct Connection<Table...>::select_or_table_table : std::type_identity<table_for_class_t<T>> {};
+    template <typename ConnectionT, typename SelectOrTable>
+    struct select_or_table_table_impl;
 
-    template <class... Table>
-    template <typename From, typename... T>
-    struct Connection<Table...>::select_or_table_table<Select<From, T...>> : std::type_identity<table_for_class_t<From>> {};
+    template <class... Table, typename T>
+    struct select_or_table_table_impl<Connection<Table...>, T>
+        : std::type_identity<typename Connection<Table...>::template table_for_class<T>::type> {};
+
+    template <class... Table, typename From, typename... T>
+    struct select_or_table_table_impl<Connection<Table...>, Select<From, T...>>
+        : std::type_identity<typename Connection<Table...>::template table_for_class<From>::type> {};
 
     template<class Join>
     auto get_seletables_from_join(Join j) {
@@ -506,7 +511,7 @@ namespace zxorm {
         // otherwise it should be deduced from the first thing selected
         using from_t = std::conditional_t<from_clause_present,
             from_unwrapped,
-            typename select_or_table_table<SelectOrTable>::type
+            typename select_or_table_table_impl<Connection<Table...>, SelectOrTable>::type
         >;
 
         static_assert(all_of<(is_join<Clauses>)...>,
@@ -544,7 +549,7 @@ namespace zxorm {
             static constexpr bool results_are_optional = query_is_nested && a_selection_is_optional<selectables_t>::value;
             return SelectQueryBuilder<
                 selectables_t,
-                typename select_type<results_are_optional, selectables_t, from_t, SelectOrTable>::type,
+                typename select_type_impl<Connection<Table...>, results_are_optional, selectables_t, from_t, SelectOrTable>::type,
                 joins_tuple>
             (
                 _db_handle.get(),
@@ -558,7 +563,7 @@ namespace zxorm {
             // only the `from_t` is selectable since there are no joins
             using selectables_t = std::tuple<__selectable_table<false, table_for_class_t<from_t>::name>>;
 
-            return SelectQueryBuilder<selectables_t, typename select_type<false, std::tuple<>, from_t, SelectOrTable>::type> (
+            return SelectQueryBuilder<selectables_t, typename select_type_impl<Connection<Table...>, false, std::tuple<>, from_t, SelectOrTable>::type> (
                 _db_handle.get(),
                 _logger
             );
@@ -756,9 +761,9 @@ namespace zxorm {
 
         count_stmt.step();
 
-        ssize_t count;
+        int64_t count;
         count_stmt.read_column(0, count);
-        return count;
+        return static_cast<size_t>(count);
     }
 
     template <class... Table>

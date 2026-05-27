@@ -173,7 +173,7 @@ namespace zxorm {
         static_assert(not std::is_void<typename getter_traits::return_type>::value,
             "Column template argument should be a pointer to a class method that gets the column data. The return type should not be `void`");
 
-        static_assert(std::is_same<typename getter_traits::return_type, typename setter_traits::arg_type>::value,
+        static_assert(std::is_same<std::remove_cvref_t<typename getter_traits::return_type>, std::remove_cvref_t<typename setter_traits::arg_type>>::value,
                 "Column template arguments should be a pointers to class methods that get and set the column data");
 
         public:
@@ -192,7 +192,7 @@ namespace zxorm {
 
         static constexpr auto name = column_name;
 
-        static auto& getter(auto& obj) { return (obj.*Getter)(); };
+        static decltype(auto) getter(auto& obj) { return (obj.*Getter)(); };
         static void setter(auto& obj, auto arg) { (obj.*Setter)(arg); };
 
         static std::string constraint_creation_query() {
